@@ -47,7 +47,10 @@ Public Video URL
                │
                ▼  Match Result (start_time, end_time, confidence)
 ┌────────────────────────────────────────┐
-│ Phase 6: Frame Extraction & Result     │  (Upcoming Phase)
+│ Phase 6: Frame Extraction              │  FFmpeg (-ss timestamp -vframes 1)
+│ - Exact PTS timestamp-based seek       │
+│ - CFR & VFR container compatible       │
+│ - Frame resolution & metadata probe    │
 └────────────────────────────────────────┘
 ```
 
@@ -121,11 +124,21 @@ result = match_dialogue(
     confidence_threshold=80.0
 )
 
-if result.match_found:
-    print(f"Match Found! Confidence: {result.confidence:.1f}%")
-    print(f"Start Time:  {result.start_time:.2f}s")
-    print(f"End Time:    {result.end_time:.2f}s")
-    print(f"Raw Text:    '{result.matched_window_raw_text}'")
+### 5. Extracting Video Frame at Dialogue Timestamp (Phase 6)
+
+```python
+from frame_extraction import extract_frame
+
+# Extract video frame at matched dialogue timestamp (e.g. 320.48s)
+frame_res = extract_frame(
+    video_path="output/248244667877.mp4",
+    timestamp=result.start_time, # 320.48s
+    output_dir="output/frames"
+)
+
+print(f"Extracted Frame: {frame_res.frame_path}")
+print(f"Resolution:      {frame_res.width}x{frame_res.height}")
+print(f"Extraction Time: {frame_res.extraction_duration_seconds}s")
 ```
 
 ---
