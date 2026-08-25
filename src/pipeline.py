@@ -20,6 +20,16 @@ from matching import match_dialogue
 logger = logging.getLogger(__name__)
 
 
+def format_timestamp_hms(seconds: Optional[float]) -> str:
+    """Format floating point seconds to HH:MM:SS.sss string format."""
+    if seconds is None or seconds < 0:
+        return "00:00:00.000"
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
+
+
 @dataclass
 class LocalizationResult:
     """Final output result of Video Dialogue Localization."""
@@ -35,20 +45,26 @@ class LocalizationResult:
     width: int
     height: int
 
+    @property
+    def timestamp_hms(self) -> str:
+        """Returns timestamp in HH:MM:SS.sss format."""
+        return format_timestamp_hms(self.timestamp)
+
     def display(self):
         """Format and print the required minimum output fields."""
         print("\n" + "=" * 65)
         print("         VIDEO DIALOGUE LOCALIZATION OUTPUT RESULT")
         print("=" * 65)
-        print(f" * Target Dialogue Query:    '{self.dialogue_query}'")
+        print(f" * Dialogue Query:           \"{self.dialogue_query}\"")
         print(f" * Match Found:              {self.match_found}")
         if self.match_found:
-            print(f" * Timestamp of Frame:       {self.timestamp:.2f} seconds")
-            frame_num_str = f"{self.frame_number}" if self.frame_number is not None else "N/A"
+            print(f" * Timestamp of Frame (HMS): {self.timestamp_hms}")
+            print(f" * Timestamp (Seconds):      {self.timestamp:.2f}s")
+            frame_num_str = f"{self.frame_number}" if self.frame_number is not None else "N/A (VFR)"
             print(f" * Frame Number:             {frame_num_str}")
-            print(f" * Extracted Dialogue Text:  '{self.extracted_dialogue_text}'")
+            print(f" * Extracted Dialogue Text:  \"{self.extracted_dialogue_text}\"")
             print(f" * Confidence Score:         {self.confidence:.1f}%")
-            print(f" * Video Frame Image:        {self.frame_image_path}")
+            print(f" * Corresponding Frame Image:{self.frame_image_path}")
             print(f" * Frame Resolution:         {self.width} x {self.height}")
         print("=" * 65 + "\n")
 
@@ -59,6 +75,7 @@ class LocalizationResult:
             "dialogue_query": self.dialogue_query,
             "match_found": self.match_found,
             "timestamp": self.timestamp,
+            "timestamp_hms": self.timestamp_hms,
             "frame_number": self.frame_number,
             "extracted_dialogue_text": self.extracted_dialogue_text,
             "frame_image_path": str(self.frame_image_path) if self.frame_image_path else None,
