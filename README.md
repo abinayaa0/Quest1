@@ -39,7 +39,15 @@ Public Video URL
                │
                ▼  Timestamped Transcript JSON
 ┌────────────────────────────────────────┐
-│ Phase 5: Dialogue Search & Frame Map   │  (Upcoming Phase)
+│ Phase 5: Dialogue Matching             │  RapidFuzz + Word Windows
+│ - Sliding window dialogue search       │
+│ - First occurrence detection           │
+│ - Fuzzy text matching & scoring        │
+└──────────────┬─────────────────────────┘
+               │
+               ▼  Match Result (start_time, end_time, confidence)
+┌────────────────────────────────────────┐
+│ Phase 6: Frame Extraction & Result     │  (Upcoming Phase)
 └────────────────────────────────────────┘
 ```
 
@@ -101,11 +109,23 @@ print(f"Detected Language: {result.language} (prob={result.language_probability:
 print(f"Total Segments:    {len(result.segments)}")
 print(f"Full Text:         {result.full_text[:100]}...")
 
-# Access segment & word-level timestamps
-for segment in result.segments[:3]:
-    print(f"\n[{segment.start:.2f}s -> {segment.end:.2f}s] {segment.text}")
-    for word in segment.words:
-        print(f"  word: '{word.word}' ({word.start:.2f}s -> {word.end:.2f}s)")
+### 4. Matching Dialogue to Timestamps (Phase 5)
+
+```python
+from matching import match_dialogue
+
+# Match target dialogue query against transcript JSON or object
+result = match_dialogue(
+    target_text="My mind rebels at stagnation",
+    transcript="output/248244667877_transcript_small.json",
+    confidence_threshold=80.0
+)
+
+if result.match_found:
+    print(f"Match Found! Confidence: {result.confidence:.1f}%")
+    print(f"Start Time:  {result.start_time:.2f}s")
+    print(f"End Time:    {result.end_time:.2f}s")
+    print(f"Raw Text:    '{result.matched_window_raw_text}'")
 ```
 
 ---

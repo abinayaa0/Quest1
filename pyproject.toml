@@ -5,6 +5,7 @@ requires-python = ">=3.10"
 dependencies = [
     "yt-dlp",
     "faster-whisper",
+    "rapidfuzz",
 ]
 
 [tool.pytest.ini_options]
