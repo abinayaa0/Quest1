@@ -158,7 +158,17 @@ def localize_dialogue(
 
     # Calculate frame number estimate if fps is available
     timestamp = match_res.start_time
-    frame_number = int(round(timestamp * fps)) if fps > 0 else None
+    fps_val = 23.976
+    if isinstance(fps, (int, float)):
+        fps_val = float(fps)
+    elif isinstance(fps, str) and "/" in fps:
+        try:
+            num, denom = fps.split("/")
+            fps_val = float(num) / float(denom)
+        except Exception:
+            fps_val = 23.976
+
+    frame_number = int(round(timestamp * fps_val)) if fps_val > 0 else None
 
     # 5. Frame Extraction
     frames_dir = out_dir / "frames"

@@ -3,7 +3,9 @@
 import logging
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+from typing import Optional
 from typing import Tuple
 from urllib.parse import urlparse
 
@@ -28,10 +30,16 @@ def _is_direct_media_url(url: str) -> bool:
 
 
 def _download_with_ytdlp(
-    url: str, output_dir: Path, timeout: int = 1800, proxy: str | None = None
+    url: str,
+    output_dir: Path,
+    proxy: Optional[str] = None,
+    timeout: int = 1800,
 ) -> Path:
-    """Download video using yt-dlp subprocess."""
-    if not shutil.which("yt-dlp"):
+    """Download video using yt-dlp CLI tool."""
+    venv_ytdlp = Path(sys.executable).parent / "yt-dlp.exe"
+    ytdlp_bin = shutil.which("yt-dlp") or (str(venv_ytdlp) if venv_ytdlp.exists() else None)
+
+    if not ytdlp_bin:
         raise DependencyError(
             "yt-dlp not found on PATH. Install with: pip install yt-dlp"
         )
@@ -39,10 +47,9 @@ def _download_with_ytdlp(
     output_template = str(output_dir / "%(id)s.%(ext)s")
 
     cmd = [
-        "yt-dlp",
+        ytdlp_bin,
         "--no-playlist",
-        "--merge-output-format", "mp4",
-        "--format",
+        "-f",
         "bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo+bestaudio/best",
         "--no-write-subs",
         "--no-write-auto-subs",
