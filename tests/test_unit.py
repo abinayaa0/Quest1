@@ -277,8 +277,9 @@ class TestProbe:
 # ---------------------------------------------------------------------------
 
 class TestDownloader:
+    @patch("ingestion.downloader.Path.exists", return_value=False)
     @patch("ingestion.downloader.shutil.which", return_value=None)
-    def test_missing_ytdlp(self, _):
+    def test_missing_ytdlp(self, _, __):
         with tempfile.TemporaryDirectory() as td:
             with pytest.raises(DependencyError, match="yt-dlp"):
                 download_video("https://example.com/video", Path(td))

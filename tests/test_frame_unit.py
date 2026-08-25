@@ -79,6 +79,6 @@ class TestFrameExtractorMocked:
             ffmpeg_cmd = mock_run.call_args_list[0][0][0]
             assert "ffmpeg" in ffmpeg_cmd[0]
             assert "-ss" in ffmpeg_cmd
-            assert "320.48" in ffmpeg_cmd
+            assert "320.460" in ffmpeg_cmd
             assert "-vframes" in ffmpeg_cmd
             assert "1" in ffmpeg_cmd

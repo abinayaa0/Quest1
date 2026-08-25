@@ -107,13 +107,15 @@ def extract_frame(
     frame_path = out_dir / output_filename
 
     start_time = time.time()
-    logger.info(f"Extracting frame at timestamp {timestamp:.2f}s from {path} -> {frame_path}")
+    # Apply a tiny 20ms (0.02s) half-frame pre-roll offset when seeking to ensure FFmpeg
+    # captures the exact speech onset frame rather than skipping 1 frame ahead (PTS >= timestamp)
+    seek_ts = max(0.0, timestamp - 0.02)
 
     # FFmpeg command for accurate timestamp seeking
     cmd = [
         "ffmpeg",
         "-y",
-        "-ss", str(timestamp),
+        "-ss", f"{seek_ts:.3f}",
         "-i", str(path),
         "-vframes", "1",
         "-q:v", "2",  # High JPEG quality
