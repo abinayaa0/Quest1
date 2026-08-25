@@ -145,6 +145,55 @@ def generate_windows(
     return windows
 
 
+def refine_window_timestamps(
+    window: WordWindow,
+    target_text: str,
+) -> tuple[float, float, str, float]:
+    """
+    Refines a matched WordWindow by locating the exact first and last target query words
+    inside the window's word sequence, trimming unrelated prefix and suffix words.
+
+    Returns:
+        (refined_start_time, refined_end_time, trimmed_raw_text, refined_confidence)
+    """
+    norm_target_words = normalize_text(target_text).split()
+    if not norm_target_words or not window.words:
+        return window.start_time, window.end_time, window.raw_text, 0.0
+
+    win_norm_words = [normalize_text(w.word) for w in window.words]
+
+    first_target_word = norm_target_words[0]
+    last_target_word = norm_target_words[-1]
+
+    # Find earliest match for first target word in window
+    start_idx = 0
+    for idx, w_norm in enumerate(win_norm_words):
+        if w_norm == first_target_word or fuzz.ratio(first_target_word, w_norm) >= 75:
+            start_idx = idx
+            break
+
+    # Find latest match for last target word in window
+    end_idx = len(window.words) - 1
+    for idx in range(len(win_norm_words) - 1, start_idx - 1, -1):
+        w_norm = win_norm_words[idx]
+        if w_norm == last_target_word or fuzz.ratio(last_target_word, w_norm) >= 75:
+            end_idx = idx
+            break
+
+    trimmed_words = window.words[start_idx : end_idx + 1]
+    if not trimmed_words:
+        trimmed_words = window.words
+
+    refined_start = trimmed_words[0].start
+    refined_end = trimmed_words[-1].end
+    trimmed_raw_text = " ".join(w.word for w in trimmed_words)
+    trimmed_norm_text = normalize_text(trimmed_raw_text)
+
+    refined_confidence = float(fuzz.ratio(normalize_text(target_text), trimmed_norm_text))
+
+    return refined_start, refined_end, trimmed_raw_text, refined_confidence
+
+
 def match_dialogue(
     target_text: str,
     transcript: Any,
@@ -202,28 +251,35 @@ def match_dialogue(
 
         # FIRST OCCURRENCE RULE: Immediately return the first window meeting/exceeding threshold
         if score >= confidence_threshold:
+            # Refine word timestamps by trimming prefix and suffix words
+            ref_start, ref_end, ref_text, ref_conf = refine_window_timestamps(win, target_text)
+
             logger.info(
-                f"Match found chronologically at [{win.start_time:.2f}s - {win.end_time:.2f}s] "
-                f"with confidence {score:.1f}% >= threshold {confidence_threshold}%"
+                f"Match found chronologically at [{ref_start:.2f}s - {ref_end:.2f}s] "
+                f"with refined confidence {ref_conf:.1f}% >= threshold {confidence_threshold}%"
             )
             return MatchResult(
                 match_found=True,
-                matched_text=win.normalized_text,
-                start_time=win.start_time,
-                end_time=win.end_time,
-                confidence=score,
-                matched_window_raw_text=win.raw_text,
+                matched_text=normalize_text(ref_text),
+                start_time=ref_start,
+                end_time=ref_end,
+                confidence=max(score, ref_conf),
+                matched_window_raw_text=ref_text,
             )
 
     # No window met confidence_threshold
     logger.info(
         f"No match exceeded threshold {confidence_threshold}%. Best score was {best_score_overall:.1f}%"
     )
-    return MatchResult(
-        match_found=False,
-        confidence=best_score_overall,
-        matched_text=best_window_overall.normalized_text if best_window_overall else None,
-        start_time=best_window_overall.start_time if best_window_overall else None,
-        end_time=best_window_overall.end_time if best_window_overall else None,
-        matched_window_raw_text=best_window_overall.raw_text if best_window_overall else None,
-    )
+    if best_window_overall:
+        ref_start, ref_end, ref_text, ref_conf = refine_window_timestamps(best_window_overall, target_text)
+        return MatchResult(
+            match_found=False,
+            confidence=max(best_score_overall, ref_conf),
+            matched_text=normalize_text(ref_text),
+            start_time=ref_start,
+            end_time=ref_end,
+            matched_window_raw_text=ref_text,
+        )
+
+    return MatchResult(match_found=False, confidence=0.0)
