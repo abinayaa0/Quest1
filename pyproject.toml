@@ -1,0 +1,11 @@
+[project]
+name = "video-ingestion"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["yt-dlp"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+markers = [
+    "integration: real network integration tests (deselect with '-m \"not integration\"')",
+]

@@ -1,0 +1,34 @@
+# Virtual environment
+.venv/
+env/
+venv/
+ENV/
+
+# Output artifacts & media downloads
+output/
+*.mp4
+*.wav
+*.ts
+*.m3u8
+*.temp.mp4
+okru_direct.txt
+direct_url.txt
+page.html
+
+# Python cache & build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# IDE & system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
