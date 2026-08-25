@@ -1,3 +1,4 @@
 yt-dlp>=2026.8.19
 pytest>=9.1.1
 curl-cffi>=0.16.1
+faster-whisper>=1.2.1
