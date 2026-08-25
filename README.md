@@ -2,6 +2,9 @@
 
 An end-to-end Python pipeline for ingesting public video URLs (YouTube, OK.ru, Vimeo, direct streams), extracting 16kHz mono PCM WAV speech audio, and generating segment & word-level timestamped transcripts using Faster-Whisper.
 
+> [!NOTE]
+> 📖 **Full System Documentation**: See [system_documentation.md](file:///C:/Users/Abinaya/.gemini/antigravity-ide/brain/5bc8256e-0a7c-4ccc-9522-9f6ca65ee0e7/system_documentation.md) for complete architecture, benchmarking, and component details.
+
 ---
 
 ## 📌 System Overview
