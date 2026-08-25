@@ -36,6 +36,18 @@ class MatchResult:
     confidence: float = 0.0
     matched_window_raw_text: Optional[str] = None
 
+    @property
+    def match_quality(self) -> str:
+        """Classify confidence score into human-interpretable quality tier."""
+        if self.confidence > 90.0:
+            return "Strong match"
+        elif self.confidence >= 80.0:
+            return "Acceptable"
+        elif self.confidence >= 70.0:
+            return "Needs review"
+        else:
+            return "Reject"
+
     def to_dict(self) -> dict:
         """Convert result to dictionary."""
         return {
@@ -44,5 +56,6 @@ class MatchResult:
             "start_time": self.start_time,
             "end_time": self.end_time,
             "confidence": round(self.confidence, 2),
+            "match_quality": self.match_quality,
             "matched_window_raw_text": self.matched_window_raw_text,
         }

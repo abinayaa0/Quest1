@@ -50,6 +50,18 @@ class LocalizationResult:
         """Returns timestamp in HH:MM:SS.sss format."""
         return format_timestamp_hms(self.timestamp)
 
+    @property
+    def confidence_quality(self) -> str:
+        """Classify confidence score into human-interpretable quality tier."""
+        if self.confidence > 90.0:
+            return "Strong match"
+        elif self.confidence >= 80.0:
+            return "Acceptable"
+        elif self.confidence >= 70.0:
+            return "Needs review"
+        else:
+            return "Reject"
+
     def display(self):
         """Format and print the required minimum output fields."""
         print("\n" + "=" * 65)
@@ -63,7 +75,7 @@ class LocalizationResult:
             frame_num_str = f"{self.frame_number}" if self.frame_number is not None else "N/A (VFR)"
             print(f" * Frame Number:             {frame_num_str}")
             print(f" * Extracted Dialogue Text:  \"{self.extracted_dialogue_text}\"")
-            print(f" * Confidence Score:         {self.confidence:.1f}%")
+            print(f" * Confidence Score:         {self.confidence:.1f}% ({self.confidence_quality})")
             print(f" * Corresponding Frame Image:{self.frame_image_path}")
             print(f" * Frame Resolution:         {self.width} x {self.height}")
         print("=" * 65 + "\n")
@@ -80,6 +92,7 @@ class LocalizationResult:
             "extracted_dialogue_text": self.extracted_dialogue_text,
             "frame_image_path": str(self.frame_image_path) if self.frame_image_path else None,
             "confidence": round(self.confidence, 2),
+            "confidence_quality": self.confidence_quality,
             "width": self.width,
             "height": self.height,
         }

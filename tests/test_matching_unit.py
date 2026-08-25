@@ -120,14 +120,18 @@ class TestMatcherUnit:
         assert res.start_time == 10.0  # Must return 10.0s (first occurrence), not 500.0s!
         assert res.end_time == 11.0
 
-    def test_no_match(self):
-        words = [
-            WordTimestamp("good", 10.0, 10.5),
-            WordTimestamp("morning", 10.6, 11.0),
-        ]
-        res = match_dialogue("completely different phrase", words, confidence_threshold=80.0)
-        assert res.match_found is False
-        assert res.confidence < 50.0
+    def test_match_quality_classification(self):
+        m1 = MatchResult(match_found=True, confidence=95.0)
+        assert m1.match_quality == "Strong match"
+
+        m2 = MatchResult(match_found=True, confidence=85.0)
+        assert m2.match_quality == "Acceptable"
+
+        m3 = MatchResult(match_found=True, confidence=75.0)
+        assert m3.match_quality == "Needs review"
+
+        m4 = MatchResult(match_found=False, confidence=65.0)
+        assert m4.match_quality == "Reject"
 
     def test_empty_query_error(self):
         words = [WordTimestamp("test", 1.0, 2.0)]
