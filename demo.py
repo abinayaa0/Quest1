@@ -1,8 +1,5 @@
 """
-Video Dialogue Localization — End-to-End Execution Script
-================================──────────────────────────
-Given a target dialogue query, locates the exact timestamp, frame number,
-extracted dialogue text, and outputs the video frame image.
+Video Dialogue Localization — Demonstration Script comparing Small vs Base Models
 """
 
 import sys
@@ -15,19 +12,26 @@ from pipeline import localize_dialogue
 
 if __name__ == "__main__":
     video_file = Path("output/248244667877.mp4")
+    query = "My mind rebels at stagnation"
 
-    # Example 1: Sherlock's quote
-    result1 = localize_dialogue(
+    print("\n" + "=" * 65)
+    print("      COMPARING FASTER-WHISPER 'SMALL' vs 'BASE' MODELS")
+    print("=" * 65)
+
+    # Test 1: Using 'small' model
+    print("\n--- [1] TESTING FASTER-WHISPER 'SMALL' MODEL ---")
+    result_small = localize_dialogue(
         video_url_or_path=video_file,
-        dialogue_query="My mind rebels at stagnation",
+        dialogue_query=query,
         model_size="small"
     )
-    result1.display()
+    result_small.display()
 
-    # Example 2: Opening narration quote
-    result2 = localize_dialogue(
+    # Test 2: Using 'base' model
+    print("\n--- [2] TESTING FASTER-WHISPER 'BASE' MODEL ---")
+    result_base = localize_dialogue(
         video_url_or_path=video_file,
-        dialogue_query="To Sherlock Holmes she was always the woman",
-        model_size="small"
+        dialogue_query=query,
+        model_size="base"
     )
-    result2.display()
+    result_base.display()
