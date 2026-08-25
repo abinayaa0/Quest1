@@ -1,6 +1,7 @@
 """Dialogue matching implementation using RapidFuzz and word-level sliding windows."""
 
 import logging
+from pathlib import Path
 from typing import Any, List, Optional, Union
 
 from rapidfuzz import fuzz
@@ -15,10 +16,18 @@ logger = logging.getLogger(__name__)
 def extract_words_from_transcript(transcript: Any) -> List[WordTimestamp]:
     """
     Extract a flat chronological list of WordTimestamp objects from various transcript formats.
-    Supports TranscriptionResult dataclass, dictionary, or direct list of words.
+    Supports TranscriptionResult dataclass, dictionary, list, or Path/file string to transcript JSON.
     """
     if not transcript:
         raise EmptyTranscriptError("Transcript input is empty or None")
+
+    # If transcript is a file path string or Path object, load it from JSON
+    if isinstance(transcript, (str, Path)):
+        t_path = Path(transcript).resolve()
+        if t_path.exists() and t_path.is_file():
+            import json
+            with open(t_path, "r", encoding="utf-8") as f:
+                transcript = json.load(f)
 
     words: List[WordTimestamp] = []
 
