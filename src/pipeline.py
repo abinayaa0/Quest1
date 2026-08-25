@@ -44,6 +44,7 @@ class LocalizationResult:
     confidence: float
     width: int
     height: int
+    pipeline_duration_seconds: float = 0.0
 
     @property
     def timestamp_hms(self) -> str:
@@ -78,6 +79,7 @@ class LocalizationResult:
             print(f" * Confidence Score:         {self.confidence:.1f}% ({self.confidence_quality})")
             print(f" * Corresponding Frame Image:{self.frame_image_path}")
             print(f" * Frame Resolution:         {self.width} x {self.height}")
+        print(f" * Pipeline Execution Time:  {self.pipeline_duration_seconds:.3f} seconds")
         print("=" * 65 + "\n")
 
     def to_dict(self) -> dict:
@@ -95,6 +97,7 @@ class LocalizationResult:
             "confidence_quality": self.confidence_quality,
             "width": self.width,
             "height": self.height,
+            "pipeline_duration_seconds": round(self.pipeline_duration_seconds, 3),
         }
 
 
@@ -118,6 +121,9 @@ def localize_dialogue(
     Returns:
         LocalizationResult object containing timestamp, frame_number, extracted text, frame image path.
     """
+    import time
+    start_t = time.time()
+
     out_dir = Path(output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -155,6 +161,8 @@ def localize_dialogue(
         confidence_threshold=confidence_threshold,
     )
 
+    elapsed_t = round(time.time() - start_t, 3)
+
     if not match_res.match_found:
         return LocalizationResult(
             video_path=video_path,
@@ -167,6 +175,7 @@ def localize_dialogue(
             confidence=match_res.confidence,
             width=0,
             height=0,
+            pipeline_duration_seconds=elapsed_t,
         )
 
     # Calculate frame number estimate if fps is available
@@ -192,6 +201,8 @@ def localize_dialogue(
     )
     frame_res.frame_number = frame_number
 
+    elapsed_t = round(time.time() - start_t, 3)
+
     return LocalizationResult(
         video_path=video_path,
         dialogue_query=dialogue_query,
@@ -203,4 +214,5 @@ def localize_dialogue(
         confidence=match_res.confidence,
         width=frame_res.width,
         height=frame_res.height,
+        pipeline_duration_seconds=elapsed_t,
     )
