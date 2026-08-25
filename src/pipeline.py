@@ -1,0 +1,166 @@
+"""
+Unified Pipeline Entry Point — Video Dialogue Localization
+================================────────────────────────────
+Executes the full pipeline:
+Ingest Video -> Extract Audio -> Transcribe Speech -> Match Dialogue -> Extract Frame
+"""
+
+import json
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional, Union
+
+from asr import transcribe_audio
+from audio import extract_audio
+from frame_extraction import extract_frame
+from ingestion import ingest_video
+from matching import match_dialogue
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class LocalizationResult:
+    """Final output result of Video Dialogue Localization."""
+
+    video_path: Path
+    dialogue_query: str
+    match_found: bool
+    timestamp: Optional[float]
+    frame_number: Optional[int]
+    extracted_dialogue_text: Optional[str]
+    frame_image_path: Optional[Path]
+    confidence: float
+    width: int
+    height: int
+
+    def display(self):
+        """Format and print the required minimum output fields."""
+        print("\n" + "=" * 65)
+        print("         VIDEO DIALOGUE LOCALIZATION OUTPUT RESULT")
+        print("=" * 65)
+        print(f" * Target Dialogue Query:    '{self.dialogue_query}'")
+        print(f" * Match Found:              {self.match_found}")
+        if self.match_found:
+            print(f" * Timestamp of Frame:       {self.timestamp:.2f} seconds")
+            frame_num_str = f"{self.frame_number}" if self.frame_number is not None else "N/A"
+            print(f" * Frame Number:             {frame_num_str}")
+            print(f" * Extracted Dialogue Text:  '{self.extracted_dialogue_text}'")
+            print(f" * Confidence Score:         {self.confidence:.1f}%")
+            print(f" * Video Frame Image:        {self.frame_image_path}")
+            print(f" * Frame Resolution:         {self.width} x {self.height}")
+        print("=" * 65 + "\n")
+
+    def to_dict(self) -> dict:
+        """Convert result to dictionary."""
+        return {
+            "video_path": str(self.video_path),
+            "dialogue_query": self.dialogue_query,
+            "match_found": self.match_found,
+            "timestamp": self.timestamp,
+            "frame_number": self.frame_number,
+            "extracted_dialogue_text": self.extracted_dialogue_text,
+            "frame_image_path": str(self.frame_image_path) if self.frame_image_path else None,
+            "confidence": round(self.confidence, 2),
+            "width": self.width,
+            "height": self.height,
+        }
+
+
+def localize_dialogue(
+    video_url_or_path: Union[str, Path],
+    dialogue_query: str,
+    output_dir: Union[str, Path] = "output",
+    model_size: str = "small",
+    confidence_threshold: float = 75.0,
+) -> LocalizationResult:
+    """
+    Run end-to-end video dialogue localization pipeline.
+
+    Args:
+        video_url_or_path: Public video URL (e.g. OK.ru, YouTube) or local video file path.
+        dialogue_query: Spoken dialogue text to locate.
+        output_dir: Directory for storing output artifacts.
+        model_size: Faster-Whisper ASR model size ('tiny', 'base', 'small', 'medium').
+        confidence_threshold: RapidFuzz minimum match score (default 75.0).
+
+    Returns:
+        LocalizationResult object containing timestamp, frame_number, extracted text, frame image path.
+    """
+    out_dir = Path(output_dir).resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    input_str = str(video_url_or_path)
+
+    # 1. Video Ingestion
+    if input_str.startswith(("http://", "https://")):
+        logger.info(f"Ingesting video from URL: {input_str}")
+        ingest_res = ingest_video(input_str, output_dir=out_dir)
+        video_path = ingest_res.video_path
+        fps = ingest_res.metadata.fps
+    else:
+        video_path = Path(video_url_or_path).resolve()
+        fps = 23.976  # Default fall-back FPS estimate
+
+    # 2. Audio Extraction
+    wav_path = out_dir / f"{video_path.stem}.wav"
+    if not wav_path.exists():
+        logger.info(f"Extracting 16kHz mono WAV audio from {video_path}...")
+        audio_res = extract_audio(video_path, output_path=wav_path)
+        wav_path = audio_res.audio_path
+
+    # 3. ASR Speech Recognition
+    transcript_path = out_dir / f"{video_path.stem}_transcript_{model_size}.json"
+    if not transcript_path.exists():
+        logger.info(f"Transcribing audio with Faster-Whisper ({model_size})...")
+        asr_res = transcribe_audio(wav_path, model_size=model_size, device="cpu", compute_type="int8")
+        transcript_path = asr_res.save_json(transcript_path)
+
+    # 4. Dialogue Matching
+    logger.info(f"Matching dialogue query: '{dialogue_query}'...")
+    match_res = match_dialogue(
+        target_text=dialogue_query,
+        transcript=transcript_path,
+        confidence_threshold=confidence_threshold,
+    )
+
+    if not match_res.match_found:
+        return LocalizationResult(
+            video_path=video_path,
+            dialogue_query=dialogue_query,
+            match_found=False,
+            timestamp=None,
+            frame_number=None,
+            extracted_dialogue_text=None,
+            frame_image_path=None,
+            confidence=match_res.confidence,
+            width=0,
+            height=0,
+        )
+
+    # Calculate frame number estimate if fps is available
+    timestamp = match_res.start_time
+    frame_number = int(round(timestamp * fps)) if fps > 0 else None
+
+    # 5. Frame Extraction
+    frames_dir = out_dir / "frames"
+    frame_res = extract_frame(
+        video_path=video_path,
+        timestamp=timestamp,
+        output_dir=frames_dir,
+    )
+    frame_res.frame_number = frame_number
+
+    return LocalizationResult(
+        video_path=video_path,
+        dialogue_query=dialogue_query,
+        match_found=True,
+        timestamp=timestamp,
+        frame_number=frame_number,
+        extracted_dialogue_text=match_res.matched_window_raw_text,
+        frame_image_path=frame_res.frame_path,
+        confidence=match_res.confidence,
+        width=frame_res.width,
+        height=frame_res.height,
+    )
