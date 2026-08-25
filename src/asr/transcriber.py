@@ -1,13 +1,15 @@
-"""Faster-Whisper inference wrapper for speech transcription."""
+"""Faster-Whisper inference wrapper for speech transcription with parallel chunking & CPU thread optimization."""
 
+import concurrent.futures
 import logging
+import os
 import shutil
 import time
 from pathlib import Path
 from typing import Optional, Union
 
-from .models import WordTimestamp, TranscriptSegment, TranscriptionResult
 from .errors import ASRError, AudioNotFoundError, ModelLoadError, TranscriptionError
+from .models import TranscriptSegment, TranscriptionResult, WordTimestamp
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +21,14 @@ def get_whisper_model(
     model_size: str = "base",
     device: str = "cpu",
     compute_type: str = "int8",
+    cpu_threads: Optional[int] = None,
+    num_workers: int = 1,
 ):
     """Load or retrieve cached Faster-Whisper model instance."""
-    cache_key = (model_size, device, compute_type)
+    if cpu_threads is None:
+        cpu_threads = max(1, (os.cpu_count() or 4) // 2)
+
+    cache_key = (model_size, device, compute_type, cpu_threads, num_workers)
     if cache_key in _MODEL_CACHE:
         return _MODEL_CACHE[cache_key]
 
@@ -34,7 +41,7 @@ def get_whisper_model(
 
     logger.info(
         f"Loading Faster-Whisper model '{model_size}' "
-        f"(device={device}, compute_type={compute_type})..."
+        f"(device={device}, compute_type={compute_type}, cpu_threads={cpu_threads}, num_workers={num_workers})..."
     )
 
     try:
@@ -42,6 +49,8 @@ def get_whisper_model(
             model_size_or_path=model_size,
             device=device,
             compute_type=compute_type,
+            cpu_threads=cpu_threads,
+            num_workers=num_workers,
         )
         _MODEL_CACHE[cache_key] = model
         return model
@@ -93,6 +102,38 @@ def _transcribe_chunk(
     return parsed_segments, info
 
 
+def _chunk_worker_fn(args):
+    """Worker function executed in parallel thread pool for transcribing audio chunks."""
+    (
+        chunk_idx,
+        chunk_wav,
+        chunk_start,
+        model_size,
+        device,
+        compute_type,
+        language,
+        beam_size,
+        cpu_threads,
+    ) = args
+
+    model = get_whisper_model(
+        model_size=model_size,
+        device=device,
+        compute_type=compute_type,
+        cpu_threads=cpu_threads,
+    )
+
+    chunk_segs, info = _transcribe_chunk(
+        model=model,
+        path=chunk_wav,
+        time_offset=chunk_start,
+        language=language,
+        beam_size=beam_size,
+    )
+
+    return chunk_idx, chunk_segs, info
+
+
 def transcribe_audio_file(
     audio_path: Union[str, Path],
     model_size: str = "base",
@@ -100,12 +141,12 @@ def transcribe_audio_file(
     compute_type: str = "int8",
     language: Optional[str] = None,
     beam_size: int = 5,
-    chunk_length_seconds: int = 600,  # 10 minute chunks for memory safety
+    chunk_length_seconds: int = 600,  # 10 minute chunks for memory safety & parallelization
 ) -> TranscriptionResult:
     """
     Transcribe a local audio file to segment and word-level timestamped text using Faster-Whisper.
 
-    Automatically chunks long audio files (>10 minutes) to prevent NumPy memory errors.
+    Automatically chunks long audio files (>10 minutes) and transcribes chunks in parallel across CPU cores.
 
     Args:
         audio_path: Path to the local input audio file (.wav, .mp3, etc.).
@@ -131,13 +172,6 @@ def transcribe_audio_file(
     if path.stat().st_size == 0:
         raise AudioNotFoundError(f"Audio file is empty: {path}")
 
-    # Load model
-    model = get_whisper_model(
-        model_size=model_size,
-        device=device,
-        compute_type=compute_type,
-    )
-
     start_time = time.time()
     logger.info(f"Starting ASR transcription: {path} (model={model_size})")
 
@@ -145,8 +179,18 @@ def transcribe_audio_file(
     total_duration = 0.0
     if shutil.which("ffprobe"):
         try:
-            import json, subprocess
-            cmd = ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", str(path)]
+            import json
+            import subprocess
+
+            cmd = [
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
+                "-show_format",
+                str(path),
+            ]
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
             if r.returncode == 0:
                 data = json.loads(r.stdout)
@@ -159,49 +203,96 @@ def transcribe_audio_file(
     lang_prob = 1.0
 
     try:
-        # If audio is longer than chunk_length_seconds and FFmpeg is available, chunk it
+        # If audio is longer than chunk_length_seconds and FFmpeg is available, chunk and parallelize
         if total_duration > chunk_length_seconds and shutil.which("ffmpeg"):
-            import subprocess, tempfile
+            import subprocess
+            import tempfile
+
+            num_chunks = int(total_duration // chunk_length_seconds) + (
+                1 if total_duration % chunk_length_seconds > 0 else 0
+            )
+
+            total_cpus = os.cpu_count() or 4
+            # Determine parallel worker allocation based on CPU core count
+            max_workers = min(4, num_chunks, max(1, total_cpus // 4))
+            threads_per_worker = max(1, total_cpus // max_workers)
+
             logger.info(
                 f"Audio duration ({total_duration:.1f}s) > {chunk_length_seconds}s. "
-                f"Processing in {int(total_duration // chunk_length_seconds) + 1} chunks..."
+                f"Processing {num_chunks} chunks in PARALLEL across {max_workers} worker threads "
+                f"({threads_per_worker} CPU threads/worker)..."
             )
 
             with tempfile.TemporaryDirectory(prefix="asr_chunks_") as temp_dir:
                 temp_dir_path = Path(temp_dir)
-                num_chunks = int(total_duration // chunk_length_seconds) + (
-                    1 if total_duration % chunk_length_seconds > 0 else 0
-                )
 
+                # 1. Slice audio chunks via FFmpeg
+                chunk_tasks = []
                 for i in range(num_chunks):
                     chunk_start = i * chunk_length_seconds
                     chunk_wav = temp_dir_path / f"chunk_{i:03d}.wav"
 
                     ffmpeg_cmd = [
-                        "ffmpeg", "-y", "-ss", str(chunk_start),
-                        "-t", str(chunk_length_seconds),
-                        "-i", str(path), "-c", "copy", str(chunk_wav),
+                        "ffmpeg",
+                        "-y",
+                        "-ss",
+                        str(chunk_start),
+                        "-t",
+                        str(chunk_length_seconds),
+                        "-i",
+                        str(path),
+                        "-c",
+                        "copy",
+                        str(chunk_wav),
                     ]
                     subprocess.run(ffmpeg_cmd, capture_output=True, check=True)
 
-                    logger.info(
-                        f"Transcribing chunk {i+1}/{num_chunks} "
-                        f"({chunk_start}s -> {chunk_start + chunk_length_seconds}s)..."
+                    chunk_tasks.append(
+                        (
+                            i,
+                            chunk_wav,
+                            chunk_start,
+                            model_size,
+                            device,
+                            compute_type,
+                            language,
+                            beam_size,
+                            threads_per_worker,
+                        )
                     )
-                    chunk_segs, info = _transcribe_chunk(
-                        model, chunk_wav, time_offset=chunk_start,
-                        language=language, beam_size=beam_size,
-                    )
-                    all_segments.extend(chunk_segs)
-                    if i == 0:
-                        detected_lang = getattr(info, "language", "unknown")
-                        lang_prob = round(float(getattr(info, "language_probability", 1.0)), 4)
 
-                    if chunk_wav.exists():
-                        chunk_wav.unlink()
+                # 2. Transcribe chunks concurrently in parallel ThreadPoolExecutor
+                chunk_results = []
+                with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=max_workers
+                ) as executor:
+                    futures = [
+                        executor.submit(_chunk_worker_fn, task)
+                        for task in chunk_tasks
+                    ]
+                    for future in concurrent.futures.as_completed(futures):
+                        chunk_results.append(future.result())
+
+                # Sort chunk results by chunk index to maintain strict chronological order
+                chunk_results.sort(key=lambda x: x[0])
+
+                for idx, chunk_segs, info in chunk_results:
+                    all_segments.extend(chunk_segs)
+                    if idx == 0:
+                        detected_lang = getattr(info, "language", "unknown")
+                        lang_prob = round(
+                            float(getattr(info, "language_probability", 1.0)), 4
+                        )
 
         else:
-            # Short audio or no FFmpeg chunking: transcribe directly
+            # Short audio or single chunk: load model & transcribe directly
+            total_cpus = os.cpu_count() or 4
+            model = get_whisper_model(
+                model_size=model_size,
+                device=device,
+                compute_type=compute_type,
+                cpu_threads=total_cpus,
+            )
             all_segments, info = _transcribe_chunk(
                 model, path, time_offset=0.0, language=language, beam_size=beam_size
             )
@@ -211,7 +302,9 @@ def transcribe_audio_file(
                 total_duration = round(float(getattr(info, "duration", 0.0)), 2)
 
     except Exception as e:
-        raise TranscriptionError(f"Whisper transcription failed for {path}: {e}") from e
+        raise TranscriptionError(
+            f"Whisper transcription failed for {path}: {e}"
+        ) from e
 
     elapsed = round(time.time() - start_time, 2)
 
@@ -229,3 +322,7 @@ def transcribe_audio_file(
         model_name=model_size,
         transcription_duration_seconds=elapsed,
     )
+
+
+# Alias for backward compatibility
+transcribe_audio = transcribe_audio_file
