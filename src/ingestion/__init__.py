@@ -107,8 +107,17 @@ def ingest_video(
     start_time = time.time()
 
     try:
-        # Step 1: Download
-        video_path, method = download_video(url, output_dir, proxy=proxy)
+        # Check if video ID already exists locally in output directory to avoid network failures
+        video_id = url.rstrip("/").split("/")[-1]
+        local_existing = output_dir / f"{video_id}.mp4"
+        if local_existing.exists() and local_existing.stat().st_size > 1024:
+            logger.info(f"Reusing existing downloaded video: {local_existing}")
+            video_path = local_existing
+            method = "cached-disk"
+        else:
+            # Step 1: Download
+            video_path, method = download_video(url, output_dir, proxy=proxy)
+        
         elapsed = time.time() - start_time
         logger.info(f"Download complete ({method}) in {elapsed:.1f}s: {video_path}")
 
