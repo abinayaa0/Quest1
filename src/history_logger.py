@@ -30,38 +30,50 @@ HEADERS = [
 
 
 def append_result_to_csv(row_data: list[Any], csv_path: Path):
-    """Append a single localization result row to CSV file."""
+    """Append a single localization result row to CSV file with retry on file locks."""
     file_exists = csv_path.exists() and csv_path.stat().st_size > 0
-    try:
-        with open(csv_path, "a", newline="", encoding="utf-8-sig") as f:
-            writer = csv.writer(f)
-            if not file_exists:
-                writer.writerow(HEADERS)
-            writer.writerow(row_data)
-        logger.info(f"Appended query result to CSV: {csv_path}")
-    except Exception as e:
-        logger.error(f"Failed to append query result to CSV: {e}")
+    for attempt in range(3):
+        try:
+            with open(csv_path, "a", newline="", encoding="utf-8-sig") as f:
+                writer = csv.writer(f)
+                if not file_exists:
+                    writer.writerow(HEADERS)
+                writer.writerow(row_data)
+            logger.info(f"Appended query result to CSV: {csv_path}")
+            return
+        except PermissionError:
+            import time
+            time.sleep(0.2)
+        except Exception as e:
+            logger.warning(f"Failed to append query result to CSV: {e}")
+            return
 
 
 def append_result_to_excel(row_data: list[Any], xlsx_path: Path):
-    """Append a single localization result row to Excel (.xlsx) file using openpyxl or pandas."""
-    try:
-        import pandas as pd
-        import openpyxl
+    """Append a single localization result row to Excel (.xlsx) file with retry on file locks."""
+    for attempt in range(3):
+        try:
+            import pandas as pd
+            import openpyxl
 
-        if xlsx_path.exists() and xlsx_path.stat().st_size > 0:
-            df_existing = pd.read_excel(xlsx_path)
-            df_new = pd.DataFrame([row_data], columns=HEADERS)
-            df_combined = pd.concat([df_existing, df_new], ignore_index=True)
-        else:
-            df_combined = pd.DataFrame([row_data], columns=HEADERS)
+            if xlsx_path.exists() and xlsx_path.stat().st_size > 0:
+                df_existing = pd.read_excel(xlsx_path)
+                df_new = pd.DataFrame([row_data], columns=HEADERS)
+                df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+            else:
+                df_combined = pd.DataFrame([row_data], columns=HEADERS)
 
-        with pd.ExcelWriter(xlsx_path, engine="openpyxl") as writer:
-            df_combined.to_excel(writer, index=False, sheet_name="Query History")
+            with pd.ExcelWriter(xlsx_path, engine="openpyxl") as writer:
+                df_combined.to_excel(writer, index=False, sheet_name="Query History")
 
-        logger.info(f"Appended query result to Excel: {xlsx_path}")
-    except Exception as e:
-        logger.error(f"Failed to append query result to Excel: {e}")
+            logger.info(f"Appended query result to Excel: {xlsx_path}")
+            return
+        except PermissionError:
+            import time
+            time.sleep(0.2)
+        except Exception as e:
+            logger.warning(f"Failed to append query result to Excel: {e}")
+            return
 
 
 def log_query_result(result: Any, mode: str = "v2", output_dir: Union[str, Path] = "output"):

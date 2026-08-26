@@ -133,7 +133,12 @@ def localize_dialogue(
     out_dir = Path(output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    input_str = str(video_url_or_path)
+    # Normalize and clean dialogue query string
+    dialogue_query = dialogue_query.strip().strip('"\'“”')
+    if not dialogue_query:
+        raise ValueError("Dialogue target query phrase cannot be empty.")
+
+    input_str = str(video_url_or_path).strip()
 
     # 1. Video Ingestion
     if input_str.startswith(("http://", "https://")):
@@ -143,7 +148,14 @@ def localize_dialogue(
         fps = ingest_res.metadata.fps
     else:
         video_path = Path(video_url_or_path).resolve()
-        fps = 23.976  # Default fall-back FPS estimate
+        if not video_path.exists():
+            raise FileNotFoundError(f"Local video file not found at path: '{video_url_or_path}'")
+        from ingestion.probe import probe_file
+        try:
+            meta = probe_file(video_path)
+            fps = meta.fps
+        except Exception:
+            fps = 23.976
 
     # 2. Audio Extraction
     wav_path = out_dir / f"{video_path.stem}.wav"

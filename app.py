@@ -40,6 +40,7 @@ def main():
     st.markdown(
         "Locate exact video frames and timestamps corresponding to spoken dialogue quotes using "
         "**V2 Optimization (Coarse-to-Fine ASR)**."
+    )
     st.sidebar.header("📊 History Log")
     xlsx_path = Path("output/query_history.xlsx")
     csv_path = Path("output/query_history.csv")

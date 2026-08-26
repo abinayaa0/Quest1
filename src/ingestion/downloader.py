@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Extensions that indicate a direct media URL (for fallback only)
 _DIRECT_MEDIA_EXTENSIONS = frozenset({
     ".mp4", ".webm", ".mkv", ".avi", ".mov", ".flv",
-    ".m3u8", ".mpd", ".ts",
+    ".m3u8", ".mpd", ".ts", ".m4a", ".mp3", ".wav",
 })
 
 
@@ -68,6 +68,9 @@ def _download_with_ytdlp(
     logger.info(f"Downloading with yt-dlp: {url} (proxy={proxy})")
     logger.debug(f"yt-dlp command: {cmd}")
 
+    import time as _time
+    start_time = _time.time()
+
     try:
         result = subprocess.run(
             cmd, capture_output=True, text=True, timeout=timeout
@@ -80,9 +83,9 @@ def _download_with_ytdlp(
     if result.returncode != 0:
         stderr = result.stderr.strip()
         logger.debug(f"yt-dlp stderr:\n{stderr}")
+        clean_err = stderr[-500:] if len(stderr) > 500 else stderr
         raise DownloadError(
-            f"yt-dlp failed (exit {result.returncode}): "
-            f"{stderr[-500:] if len(stderr) > 500 else stderr}"
+            f"Video download failed (yt-dlp exit {result.returncode}): {clean_err or 'Invalid URL or unavailable video'}"
         )
 
     # Parse output path from --print after_move:filepath
@@ -90,25 +93,27 @@ def _download_with_ytdlp(
         line.strip() for line in result.stdout.strip().split("\n") if line.strip()
     ]
 
-    if stdout_lines:
-        filepath = Path(stdout_lines[-1])
-        if filepath.exists():
+    for line in reversed(stdout_lines):
+        filepath = Path(line)
+        if filepath.exists() and filepath.is_file() and filepath.suffix.lower() in _DIRECT_MEDIA_EXTENSIONS:
             logger.info(f"yt-dlp output: {filepath} ({filepath.stat().st_size} bytes)")
             return filepath
 
-    # Fallback: scan output directory for most recently modified file
-    candidates = sorted(
-        output_dir.glob("*.*"), key=lambda f: f.stat().st_mtime, reverse=True
-    )
+    # Fallback: scan output directory ONLY for valid media files modified during this download session
+    candidates = [
+        f for f in output_dir.glob("*.*")
+        if f.is_file()
+        and f.suffix.lower() in _DIRECT_MEDIA_EXTENSIONS
+        and f.stat().st_mtime >= (start_time - 5.0)
+    ]
+    candidates.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+
     if candidates:
-        logger.warning(
-            f"Could not parse yt-dlp output path from stdout, using: {candidates[0]}"
-        )
+        logger.info(f"Parsed downloaded media candidate: {candidates[0]}")
         return candidates[0]
 
     raise DownloadError(
-        f"yt-dlp completed but no output file found.\n"
-        f"stdout: {result.stdout[:300]}\nstderr: {result.stderr[:300]}"
+        f"Video download failed: No video file was downloaded for URL '{url}'. Please check if the video URL is valid and public."
     )
 
 

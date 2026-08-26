@@ -59,14 +59,18 @@ def main():
 
     # Interactive input prompt if arguments not passed via command line
     if not url_or_path:
-        url_or_path = input("\n[1] Enter Video URL or File Path [Default: output/248244667877.mp4]: ").strip()
+        url_or_path = input("\n[1] Enter Video URL or File Path [Default: output/248244667877.mp4]: ").strip().strip('"\'“”')
         if not url_or_path:
             url_or_path = "output/248244667877.mp4"
+    else:
+        url_or_path = url_or_path.strip().strip('"\'“”')
 
     if not query:
-        query = input("\n[2] Enter Target Dialogue Phrase to Locate: ").strip()
+        query = input("\n[2] Enter Target Dialogue Phrase to Locate: ").strip().strip('"\'“”')
         while not query:
-            query = input("    Please enter a non-empty phrase: ").strip()
+            query = input("    Please enter a non-empty phrase: ").strip().strip('"\'“”')
+    else:
+        query = query.strip().strip('"\'“”')
 
     if len(sys.argv) == 1:
         print("\n[3] Select ASR Pipeline Mode:")
@@ -81,13 +85,21 @@ def main():
     print(f"ASR Model Size:    '{model_size}'")
     print(f"ASR Mode:          '{mode}'")
 
-    result = localize_dialogue(
-        video_url_or_path=url_or_path,
-        dialogue_query=query,
-        output_dir="output",
-        model_size=model_size,
-        mode=mode,
-    )
+    try:
+        result = localize_dialogue(
+            video_url_or_path=url_or_path,
+            dialogue_query=query,
+            output_dir="output",
+            model_size=model_size,
+            mode=mode,
+        )
+    except Exception as exc:
+        print("\n" + "=" * 65)
+        print("         VIDEO DIALOGUE LOCALIZATION ERROR RESULT")
+        print("=" * 65)
+        print(f" [ERROR] {exc}")
+        print("=" * 65 + "\n")
+        sys.exit(1)
 
     result.display()
 
