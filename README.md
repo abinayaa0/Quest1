@@ -1,174 +1,93 @@
-# Video Dialogue Localization System — System Technical Manual
+# 🎬 Video Dialogue Localization System
 
-An end-to-end Python pipeline for ingesting public video URLs (YouTube, OK.ru, Vimeo, direct streams), extracting 16kHz mono PCM WAV speech audio, and generating segment & word-level timestamped transcripts using Faster-Whisper.
-
-> [!NOTE]
-> 📖 **Full System Documentation**: See [system_documentation.md](file:///C:/Users/Abinaya/.gemini/antigravity-ide/brain/5bc8256e-0a7c-4ccc-9522-9f6ca65ee0e7/system_documentation.md) for complete architecture, benchmarking, and component details.
+An automated AI pipeline that finds the exact timestamp and extracts the video frame where a spoken dialogue quote occurs in a video.
 
 ---
 
-## 📌 System Overview
+## 💡 What Does This System Do? (In Simple Terms)
 
-```mermaid
-graph TD
-    classDef ui fill:#2B6CB0,stroke:#2C5282,color:#FFFFFF,font-weight:bold;
-    classDef ingest fill:#D69E2E,stroke:#B7791F,color:#FFFFFF,font-weight:bold;
-    classDef asr fill:#319795,stroke:#2C7A7B,color:#FFFFFF,font-weight:bold;
-    classDef match fill:#805AD5,stroke:#6B46C1,color:#FFFFFF,font-weight:bold;
-    classDef out fill:#38A169,stroke:#2F855A,color:#FFFFFF,font-weight:bold;
+If you have a long video (such as a 54-minute episode or YouTube clip) and you want to find the exact moment someone says a specific line:
 
-    subgraph UI ["User Interfaces"]
-        A1["Streamlit Web UI (app.py)"]:::ui
-        A2["Interactive CLI (cli_v2.py)"]:::ui
-    end
+1. **You provide:** A public video URL (or local video file) and the spoken quote (e.g., *"my mind rebels at stagnation"*).
+2. **The system automatically:**
+   - Downloads/extracts the audio track from the video.
+   - Runs a **fast coarse search** across the entire video to quickly locate the approximate timestamp.
+   - Runs a **precise fine search** on just that short ~20-second time window to get exact word-level timing.
+   - Uses **FFmpeg** to seek to the exact timestamp and capture the video frame image.
+3. **You receive:** The exact timestamp (`00:05:24.970`), frame number (`#7791`), confidence score (`100%`), execution latency (`0.43s`), and the extracted video frame image.
 
-    subgraph Ingestion ["1. Ingestion & Audio Extraction"]
-        B1["Video Downloader & Local Cache\n(yt-dlp + FFmpeg)"]:::ingest
-        B2["Audio Extractor\n(16kHz Mono PCM WAV)"]:::ingest
-    end
-
-    subgraph Core ["2. V2 Coarse-to-Fine Pipeline Engine"]
-        C1["Stage 1: Coarse ASR Search\n(Whisper 'base' + 8-CPU Threads)"]:::asr
-        C2[("Coarse Disk Cache\n_transcript_coarse_base.json")]:::asr
-        
-        D1["Stage 2: RapidFuzz Dialogue Matcher\n(Partial/Token Ratio + Word Coverage)"]:::match
-        
-        E1["Stage 3: Fine Word Timestamp ASR\n(Whisper 'small' on 20s Window)"]:::asr
-        E2[("Fine Slice Cache\n_v2_fine_cache.json")]:::asr
-    end
-
-    subgraph Output ["3. Frame Extraction & Data Logging"]
-        F1["Sample-Accurate Frame Extractor\n(FFmpeg -20ms Pre-Roll Seek)"]:::out
-        F2["Target Frame Image\n(output/frames/frame_xxx.jpg)"]:::out
-        F3["History Logger\n(query_history.xlsx & .csv)"]:::out
-    end
-
-    A1 --> B1
-    A2 --> B1
-    B1 --> B2
-    B2 --> C1
-    C1 <--> C2
-    C1 --> D1
-    D1 --> E1
-    E1 <--> E2
-    E1 --> F1
-    F1 --> F2
-    F1 --> F3
-```
+Repeated searches on the same video use **on-disk caching** to return results in **under 0.25 seconds**.
 
 ---
 
-## 🛠️ Module Architecture
+## 🏗️ System Architecture & Workflow
 
-### 1. Ingestion Module (`src/ingestion/`)
-* **`ingest_video(url, output_dir=None, proxy=None)`**: Public entry point.
-* **`downloader.py`**: Invokes `yt-dlp` as a subprocess with format `bestvideo[height<=720]+bestaudio/best`. Includes direct media stream fallback (`ffmpeg -c copy`).
-* **`probe.py`**: Runs `ffprobe` to validate stream counts, duration > 0, captures rational frame rates (`"24000/1001"`), and detects VFR/CFR (`is_vfr`).
+The system uses a **V2 Coarse-to-Fine ASR Pipeline** designed for high accuracy and fast CPU performance:
 
-### 2. Audio Module (`src/audio/`)
-* **`extract_audio(video_path, output_path=None)`**: Public entry point.
-* **`extractor.py`**: Executes `ffmpeg -y -i <video> -vn -ac 1 -ar 16000 -c:a pcm_s16le <wav>` to convert audio into 16kHz 1-channel mono PCM WAV.
-* **`probe.py`**: Runs `ffprobe` to validate `sample_rate == 16000`, `channels == 1`, `duration > 0`, and `codec_name == "pcm_s16le"`.
-
-### 3. ASR Speech Recognition Module (`src/asr/`)
-* **`transcribe_audio(audio_path, model_size="base", device="cpu", compute_type="int8", language=None)`**: Public API.
-* **`transcriber.py`**: Loads `WhisperModel` from `faster-whisper` and executes CTranslate2-accelerated inference on CPU with `word_timestamps=True` and VAD filtering.
-* **`models.py`**: Dataclasses `WordTimestamp`, `TranscriptSegment`, `TranscriptionResult`.
-* **`errors.py`**: Exception hierarchy (`ASRError`, `AudioNotFoundError`, `ModelLoadError`, `TranscriptionError`).
+![System Architecture Diagram](docs/images/architecture_diagram.jpg)
 
 ---
 
-## 💻 Python API Usage Guide
+## 🖼️ User Interface & Results
 
-### 1. Ingesting Video (Phase 2)
-```python
-from ingestion import ingest_video
+### 1. Video & Query Input (Streamlit UI)
+Select your video source (URL or uploaded file) and enter the target spoken dialogue quote:
 
-result = ingest_video("https://ok.ru/video/248244667877", output_dir="output")
-print(f"Video saved to: {result.video_path}")
-print(f"Duration: {result.metadata.duration}s")
-```
+![Streamlit UI Input Screenshot](docs/images/streamlit_ui_input.png)
 
-### 2. Extracting Audio (Phase 3)
-```python
-from audio import extract_audio
+### 2. Localization Output & Extracted Frame
+The system locates the quote, calculates the exact timestamp, displays match details, and renders the extracted frame:
 
-result = extract_audio("output/248244667877.mp4")
-print(f"Audio saved to: {result.audio_path}")
-print(f"Sample Rate: {result.metadata.sample_rate} Hz")
-```
-
-### 3. Transcribing Audio to Timestamped Text (Phase 4 ASR)
-```python
-from asr import transcribe_audio
-
-# Transcribe 16kHz WAV audio using Faster-Whisper on CPU
-result = transcribe_audio(
-    audio_path="output/248244667877.wav",
-    model_size="base",   # 'tiny', 'base', 'small', 'medium', 'large-v3'
-    device="cpu",        # CPU execution
-    compute_type="int8"  # int8 precision for fast CPU inference
-)
-
-print(f"Detected Language: {result.language} (prob={result.language_probability:.2f})")
-print(f"Total Segments:    {len(result.segments)}")
-print(f"Full Text:         {result.full_text[:100]}...")
-
-### 4. Matching Dialogue to Timestamps (Phase 5)
-
-```python
-from matching import match_dialogue
-
-# Match target dialogue query against transcript JSON or object
-result = match_dialogue(
-    target_text="My mind rebels at stagnation",
-    transcript="output/248244667877_transcript_small.json",
-    confidence_threshold=80.0
-)
-
-### 5. Extracting Video Frame at Dialogue Timestamp (Phase 6)
-
-```python
-from frame_extraction import extract_frame
-
-# Extract video frame at matched dialogue timestamp (e.g. 320.48s)
-frame_res = extract_frame(
-    video_path="output/248244667877.mp4",
-    timestamp=result.start_time, # 320.48s
-    output_dir="output/frames"
-)
-
-print(f"Extracted Frame: {frame_res.frame_path}")
-print(f"Resolution:      {frame_res.width}x{frame_res.height}")
-print(f"Extraction Time: {frame_res.extraction_duration_seconds}s")
-```
+![Streamlit UI Output Screenshot](docs/images/streamlit_ui_output.png)
 
 ---
 
-## 📊 Verification Benchmarks (Supplied OK.ru Video)
+## 📚 Documentation & Development History
 
-### Target URL
-`https://ok.ru/video/248244667877` (*The Adventures of Sherlock Holmes: A Scandal in Bohemia*)
+All full design documents, architecture explanations, benchmarks, and LLM development prompts are organized under the [`docs/`](docs/) directory:
 
-### Phase 4 ASR Speech Recognition Results
-* **Status**: **PASSED** ✅
-* **Detected Language**: `en` (English, probability = 0.96)
-* **Audio Duration Transcribed**: **3,261.78 seconds** (~54 minutes)
-* **Total Segments Transcribed**: **623 segments**
-* **Word Timestamps**: **Extracted for every word**
-* **Model Used**: `tiny` / `base` (Faster-Whisper on CPU with `int8`)
-* **Transcription Time**: **123.1 seconds** (2 min 3 sec)
+- 📄 **[System Design & Engineering Approach](docs/DESIGN_AND_APPROACH.md)** — Detailed technical design, pipeline stages, trade-off decisions, and benchmark matrices.
+- 📝 **[Development & Code Generation Prompts](docs/PROMPTS.md)** — Consolidated history of implementation prompts and research queries used during development.
+- 📕 **[Design & Approach Document (PDF Version)](docs/Video_Dialogue_Localization_Design_and_Approach.pdf)** — Printable PDF copy of the design specification.
+- 📂 **[Explore Docs Directory](docs/)** — Browse all project documentation files.
 
 ---
 
-## 🧪 Test Suite Guide
+## 📊 Query History & Logs
 
-### Run Unit Tests (45/45 PASSED in 0.15s)
+Every search query processed by the system is automatically logged with 14 execution metrics (timestamps, confidence score, frame resolution, latency, etc.):
+
+- 📊 **[Download Query History (Excel Spreadsheet)](output/query_history.xlsx)**
+- 📄 **[Download Query History (CSV Document)](output/query_history.csv)**
+
+---
+
+## 🚀 Quick Start Guide
+
+### 1. Installation
+Clone the repository and install the dependencies:
 ```bash
-.\.venv\Scripts\python.exe -m pytest tests/test_unit.py tests/test_audio_unit.py tests/test_asr_unit.py -v
+git clone https://github.com/abinayaa0/Quest1.git
+cd Quest1
+pip install -r requirements.txt
+```
+> *Note: Ensure [FFmpeg](https://ffmpeg.org/) is installed and available in your system PATH.*
+
+### 2. Run the Streamlit Web Application
+```bash
+streamlit run app.py
 ```
 
-### Run Integration Tests (Real Media & Faster-Whisper Model)
+### 3. Run via Command Line Interface (CLI)
 ```bash
-.\.venv\Scripts\python.exe -m pytest tests/test_integration.py tests/test_audio_integration.py tests/test_asr_integration.py -v -m integration
+python cli_v2.py --url "https://ok.ru/video/248244667877" --query "my mind rebels at stagnation"
+```
+
+---
+
+## 🧪 Running Tests
+
+To run the unit test suite:
+```bash
+pytest tests/test_unit.py tests/test_audio_unit.py tests/test_asr_unit.py -v
 ```
