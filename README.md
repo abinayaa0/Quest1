@@ -48,7 +48,6 @@ All full design documents, architecture explanations, benchmarks, and LLM develo
 
 - 📄 **[System Design & Engineering Approach](docs/DESIGN_AND_APPROACH.md)** — Detailed technical design, pipeline stages, trade-off decisions, and benchmark matrices.
 - 📝 **[Development & Code Generation Prompts](docs/PROMPTS.md)** — Consolidated history of implementation prompts and research queries used during development.
-- 📕 **[Design & Approach Document (PDF Version)](docs/Video_Dialogue_Localization_Design_and_Approach.pdf)** — Printable PDF copy of the design specification.
 - 📂 **[Explore Docs Directory](docs/)** — Browse all project documentation files.
 
 ---
