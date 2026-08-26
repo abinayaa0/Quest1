@@ -1,5 +1,7 @@
 """
 Streamlit Web Application — Video Dialogue Localization System
+================================================================
+Modern, non-redundant UI with clean metric cards, dialogue details, and frame image container.
 """
 
 import os
@@ -36,7 +38,7 @@ def main():
     st.title("🎬 Video Dialogue Localization System")
     st.markdown(
         "Locate exact video frames and timestamps corresponding to spoken dialogue quotes using "
-        "**V2 Coarse-to-Fine ASR**."
+        "**V2 Optimization (Coarse-to-Fine ASR)**."
     )
 
     st.sidebar.header("⚙️ Configuration")
@@ -46,12 +48,23 @@ def main():
         index=0,
     )
 
+    # Check FastAPI server health status
+    if "FastAPI" in backend_mode:
+        try:
+            h_res = requests.get(f"{API_URL}/health", timeout=2)
+            if h_res.status_code == 200:
+                st.sidebar.success("🟢 FastAPI Server Connected")
+            else:
+                st.sidebar.warning("🟡 FastAPI Unreachable -> Will Fallback")
+        except Exception:
+            st.sidebar.warning("🟡 FastAPI Unreachable -> Will Fallback")
+
     st.markdown("---")
 
     col_input, col_info = st.columns([2, 1])
 
     with col_input:
-        st.subheader("1. Video Input Source")
+        st.subheader("1. Video Source")
         source_type = st.radio(
             "Select Video Source Type:",
             ["Video URL (OK.ru, YouTube, Direct MP4)", "Upload Local Video File"],
@@ -73,24 +86,25 @@ def main():
             if uploaded_file is not None:
                 saved_path = save_uploaded_file(uploaded_file)
                 video_source = str(saved_path)
-                st.success(f"Uploaded and saved: `{saved_path}`")
+                st.success(f"Uploaded & saved: `{saved_path}`")
 
         st.subheader("2. Dialogue Query")
         dialogue_query = st.text_input(
             "Enter Spoken Dialogue Phrase to Locate:",
             value="the blue carbuncle",
-            placeholder="Type quote here...",
+            placeholder="Type spoken quote here...",
         )
 
         find_button = st.button("🔍 Find Dialogue Frame", type="primary", use_container_width=True)
 
     with col_info:
         st.info(
-            "**System Pipeline Flow:**\n"
-            "1. Audio Extraction\n"
-            "2. Coarse-to-Fine ASR\n"
-            "3. RapidFuzz Dialogue Matching\n"
-            "4. Sample-Accurate Frame Extraction"
+            "**System Pipeline Architecture:**\n"
+            "• **Ingestion**: `yt-dlp` / FFmpeg\n"
+            "• **Stage 1**: Fast Coarse ASR (base)\n"
+            "• **Stage 2**: Fuzzy Top-K Search\n"
+            "• **Stage 3**: Fine Word-Timestamped ASR (small)\n"
+            "• **Extraction**: Sample-Accurate Frame"
         )
 
     if find_button:
@@ -102,7 +116,7 @@ def main():
             st.error("Please enter a dialogue query phrase.")
             return
 
-        with st.spinner("Processing video and locating dialogue quote..."):
+        with st.spinner("Processing video and locating exact dialogue frame..."):
             result_data = None
             error_msg = None
 
@@ -125,7 +139,6 @@ def main():
                 if error_msg and "FastAPI" in backend_mode:
                     st.warning(f"{error_msg} -> Falling back to Direct Local Pipeline.")
                 try:
-
                     src_dir = Path(__file__).resolve().parent / "src"
                     if str(src_dir) not in sys.path:
                         sys.path.insert(0, str(src_dir))
@@ -159,10 +172,10 @@ def main():
                     return
 
             st.markdown("---")
-            st.header("OUTPUT RESULT")
+            st.header("🎯 Localization Output Result")
 
             if not result_data.get("match_found", False):
-                st.warning("⚠️ No Dialogue Match Found in Video (`reason: dialogue_not_found`)")
+                st.error("⚠️ No Dialogue Match Found in Video (`reason: dialogue_not_found`)")
             else:
                 match = result_data
                 ts_formatted = match.get("timestamp", {}).get("formatted", "N/A")
@@ -175,41 +188,48 @@ def main():
                 height = match.get("height", 720)
                 duration = match.get("pipeline_duration_seconds", 0.0)
 
-                # Required Terminal-Style Field Summary Display
-                st.code(
-                    f" * Dialogue Query:           \"{dialogue_query.strip()}\"\n"
-                    f" * Match Found:              True\n"
-                    f" * Timestamp of Frame (HMS): {ts_formatted}\n"
-                    f" * Timestamp (Seconds):      {ts_seconds:.2f}s\n"
-                    f" * Frame Number:             {frame_no}\n"
-                    f" * Extracted Dialogue Text:  \"{extracted_text}\"\n"
-                    f" * Confidence Score:         {confidence:.1f}%\n"
-                    f" * Corresponding Frame Image:{frame_path}\n"
-                    f" * Frame Resolution:         {width} x {height}\n"
-                    f" * Pipeline Execution Time:  {duration:.3f} seconds\n",
-                    language="yaml"
-                )
-
-                # Metrics Overview Cards
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Timestamp (HMS)", ts_formatted)
-                m2.metric("Timestamp (Sec)", f"{ts_seconds:.2f}s")
-                m3.metric("Frame Number", frame_no)
-                m4.metric("Confidence Score", f"{confidence:.1f}%")
-
-                st.markdown(f"**Extracted Dialogue:** *\"{extracted_text}\"*")
-                st.markdown(f"**Resolution:** `{width} x {height}` | **Execution Latency:** `{duration:.3f}s`")
-
-                # Frame Image Display Box
-                st.subheader("🖼️ Corresponding Frame Image")
-                if frame_path and Path(frame_path).exists():
-                    st.image(
-                        frame_path,
-                        caption=f"Frame #{frame_no} at {ts_formatted} ({ts_seconds:.2f}s) — Confidence: {confidence:.1f}%",
-                        use_container_width=True,
-                    )
+                # Quality tier label
+                if confidence > 90.0:
+                    quality = "Strong Match"
+                elif confidence >= 80.0:
+                    quality = "Acceptable"
+                elif confidence >= 70.0:
+                    quality = "Needs Review"
                 else:
-                    st.warning(f"Frame image file path not found locally: `{frame_path}`")
+                    quality = "Reject"
+
+                st.success(f"✅ **Match Located Successfully!** (Quality Tier: **{quality}**)")
+
+                # 4 Clean Top Metric Cards (Non-redundant)
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("⏱️ Timestamp (HMS)", ts_formatted, delta=f"{ts_seconds:.2f} seconds")
+                m2.metric("🎞️ Frame Number", f"#{frame_no}")
+                m3.metric("🎯 Confidence Score", f"{confidence:.1f}%", delta=quality)
+                m4.metric("⚡ Pipeline Latency", f"{duration:.3f}s")
+
+                st.markdown("---")
+
+                # Dialogue Details Card & Frame Image Side-by-Side or Stacked
+                c_details, c_image = st.columns([1, 1])
+
+                with c_details:
+                    st.subheader("📝 Dialogue Details")
+                    st.markdown(f"**Target Query:** `{dialogue_query.strip()}`")
+                    st.markdown(f"**Extracted Spoken Text:**")
+                    st.info(f"💬 *\"{extracted_text}\"*")
+                    st.markdown(f"**Frame Resolution:** `{width} x {height}`")
+                    st.markdown(f"**Image File Path:** `{frame_path}`")
+
+                with c_image:
+                    st.subheader("🖼️ Extracted Video Frame")
+                    if frame_path and Path(frame_path).exists():
+                        st.image(
+                            frame_path,
+                            caption=f"Frame #{frame_no} at {ts_formatted} ({ts_seconds:.2f}s) | Confidence: {confidence:.1f}%",
+                            use_container_width=True,
+                        )
+                    else:
+                        st.warning(f"Frame image file path not found locally: `{frame_path}`")
 
 
 if __name__ == "__main__":
