@@ -107,6 +107,9 @@ def localize_dialogue(
     output_dir: Union[str, Path] = "output",
     model_size: str = "small",
     confidence_threshold: float = 75.0,
+    mode: str = "standard",
+    coarse_model_size: str = "base",
+    fine_model_size: str = "small",
 ) -> LocalizationResult:
     """
     Run end-to-end video dialogue localization pipeline.
@@ -117,6 +120,9 @@ def localize_dialogue(
         output_dir: Directory for storing output artifacts.
         model_size: Faster-Whisper ASR model size ('tiny', 'base', 'small', 'medium').
         confidence_threshold: RapidFuzz minimum match score (default 75.0).
+        mode: ASR pipeline mode ('standard' for V1 default, 'coarse_to_fine' for V2 optimization).
+        coarse_model_size: Coarse Whisper model for Stage 1 ('tiny', 'base').
+        fine_model_size: Fine Whisper model for Stage 3 ('small', 'base').
 
     Returns:
         LocalizationResult object containing timestamp, frame_number, extracted text, frame image path.
@@ -147,17 +153,31 @@ def localize_dialogue(
         wav_path = audio_res.audio_path
 
     # 3. ASR Speech Recognition
-    transcript_path = out_dir / f"{video_path.stem}_transcript_{model_size}.json"
-    if not transcript_path.exists():
-        logger.info(f"Transcribing audio with Faster-Whisper ({model_size})...")
-        asr_res = transcribe_audio(wav_path, model_size=model_size, device="cpu", compute_type="int8")
-        transcript_path = asr_res.save_json(transcript_path)
+    if mode == "coarse_to_fine":
+        logger.info(f"Transcribing audio with Coarse-to-Fine ASR mode for '{dialogue_query}'...")
+        asr_res = transcribe_audio(
+            wav_path,
+            mode="coarse_to_fine",
+            target_query=dialogue_query,
+            coarse_model_size=coarse_model_size,
+            fine_model_size=fine_model_size,
+            device="cpu",
+            compute_type="int8",
+        )
+        transcript_obj = asr_res
+    else:
+        transcript_path = out_dir / f"{video_path.stem}_transcript_{model_size}.json"
+        if not transcript_path.exists():
+            logger.info(f"Transcribing audio with Faster-Whisper ({model_size})...")
+            asr_res = transcribe_audio(wav_path, model_size=model_size, device="cpu", compute_type="int8")
+            transcript_path = asr_res.save_json(transcript_path)
+        transcript_obj = transcript_path
 
     # 4. Dialogue Matching
     logger.info(f"Matching dialogue query: '{dialogue_query}'...")
     match_res = match_dialogue(
         target_text=dialogue_query,
-        transcript=transcript_path,
+        transcript=transcript_obj,
         confidence_threshold=confidence_threshold,
     )
 

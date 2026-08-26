@@ -17,6 +17,21 @@ logger = logging.getLogger(__name__)
 _MODEL_CACHE = {}
 
 
+def unload_model_cache():
+    """Clear cached model instances and explicitly delete C++ model objects to free MKL memory."""
+    global _MODEL_CACHE
+    keys = list(_MODEL_CACHE.keys())
+    for k in keys:
+        try:
+            m = _MODEL_CACHE.pop(k)
+            del m
+        except Exception:
+            pass
+    _MODEL_CACHE.clear()
+    import gc
+    gc.collect()
+
+
 def get_whisper_model(
     model_size: str = "base",
     device: str = "cpu",
@@ -26,7 +41,16 @@ def get_whisper_model(
 ):
     """Load or retrieve cached Faster-Whisper model instance."""
     if cpu_threads is None:
-        cpu_threads = max(1, (os.cpu_count() or 4) // 2)
+        cpu_threads = min(8, os.cpu_count() or 4)
+
+    os.environ["OMP_NUM_THREADS"] = str(cpu_threads)
+    os.environ["MKL_NUM_THREADS"] = str(cpu_threads)
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
+    # Lookup any existing loaded model matching (model_size, device, compute_type)
+    for (m_size, dev, comp, _, _), model_inst in list(_MODEL_CACHE.items()):
+        if m_size == model_size and dev == device and comp == compute_type:
+            return model_inst
 
     cache_key = (model_size, device, compute_type, cpu_threads, num_workers)
     if cache_key in _MODEL_CACHE:
@@ -103,25 +127,15 @@ def _transcribe_chunk(
 
 
 def _chunk_worker_fn(args):
-    """Worker function executed in parallel thread pool for transcribing audio chunks."""
+    """Worker function executed in parallel thread pool sharing single loaded model instance."""
     (
         chunk_idx,
         chunk_wav,
         chunk_start,
-        model_size,
-        device,
-        compute_type,
+        model,
         language,
         beam_size,
-        cpu_threads,
     ) = args
-
-    model = get_whisper_model(
-        model_size=model_size,
-        device=device,
-        compute_type=compute_type,
-        cpu_threads=cpu_threads,
-    )
 
     chunk_segs, info = _transcribe_chunk(
         model=model,
@@ -213,14 +227,26 @@ def transcribe_audio_file(
             )
 
             total_cpus = os.cpu_count() or 4
-            # Determine parallel worker allocation based on CPU core count
-            max_workers = min(4, num_chunks, max(1, total_cpus // 4))
+            # Use max_workers=2 on CPU to prevent OpenMP/MKL thread oversubscription memory limits
+            max_workers = min(2, num_chunks)
             threads_per_worker = max(1, total_cpus // max_workers)
+
+            # Set OpenMP and MKL thread environment variables to prevent heap allocation spikes
+            os.environ["OMP_NUM_THREADS"] = str(threads_per_worker)
+            os.environ["MKL_NUM_THREADS"] = str(threads_per_worker)
+
+            # Load model ONCE into RAM with CTranslate2 parallel decoding worker streams
+            model = get_whisper_model(
+                model_size=model_size,
+                device=device,
+                compute_type=compute_type,
+                cpu_threads=threads_per_worker,
+                num_workers=max_workers,
+            )
 
             logger.info(
                 f"Audio duration ({total_duration:.1f}s) > {chunk_length_seconds}s. "
-                f"Processing {num_chunks} chunks in PARALLEL across {max_workers} worker threads "
-                f"({threads_per_worker} CPU threads/worker)..."
+                f"Processing {num_chunks} chunks in PARALLEL using shared model instance..."
             )
 
             with tempfile.TemporaryDirectory(prefix="asr_chunks_") as temp_dir:
@@ -241,8 +267,8 @@ def transcribe_audio_file(
                         str(chunk_length_seconds),
                         "-i",
                         str(path),
-                        "-c",
-                        "copy",
+                        "-c:a",
+                        "pcm_s16le",
                         str(chunk_wav),
                     ]
                     subprocess.run(ffmpeg_cmd, capture_output=True, check=True)
@@ -252,12 +278,9 @@ def transcribe_audio_file(
                             i,
                             chunk_wav,
                             chunk_start,
-                            model_size,
-                            device,
-                            compute_type,
+                            model,
                             language,
                             beam_size,
-                            threads_per_worker,
                         )
                     )
 

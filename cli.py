@@ -38,11 +38,20 @@ def main():
         help="Faster-Whisper model size (default 'small').",
     )
 
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="standard",
+        choices=["standard", "coarse_to_fine"],
+        help="ASR pipeline mode: 'standard' (V1 default) or 'coarse_to_fine' (V2 optimization).",
+    )
+
     args = parser.parse_args()
 
     url_or_path = args.url
     query = args.query
     model_size = args.model
+    mode = args.mode
 
     print("\n" + "=" * 65)
     print("      VIDEO DIALOGUE LOCALIZATION SYSTEM")
@@ -59,15 +68,25 @@ def main():
         while not query:
             query = input("    Please enter a non-empty phrase: ").strip()
 
+    if len(sys.argv) == 1:
+        print("\n[3] Select ASR Pipeline Mode:")
+        print("    1. Standard V1 (Full Audio ASR)")
+        print("    2. Coarse-to-Fine V2 (Two-Stage Optimization)")
+        mode_choice = input("    Select option [1/2, default 1]: ").strip()
+        if mode_choice == "2":
+            mode = "coarse_to_fine"
+
     print(f"\nProcessing Video:  '{url_or_path}'")
     print(f"Target Phrase:     '{query}'")
     print(f"ASR Model Size:    '{model_size}'")
+    print(f"ASR Mode:          '{mode}'")
 
     result = localize_dialogue(
         video_url_or_path=url_or_path,
         dialogue_query=query,
         output_dir="output",
         model_size=model_size,
+        mode=mode,
     )
 
     result.display()
