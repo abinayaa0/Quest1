@@ -1,16 +1,20 @@
 """
 Streamlit Web Application — Video Dialogue Localization System
 ================================================================
-Modern, non-redundant UI with clean metric cards, dialogue details, and frame image container.
+Direct Pipeline Streamlit Web UI.
 """
 
-import os
 import sys
-import time
 from pathlib import Path
 
-import requests
 import streamlit as st
+
+# Add src directory to Python path
+src_dir = Path(__file__).resolve().parent / "src"
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+
+from pipeline import localize_dialogue
 
 # Set Streamlit Page Configuration
 st.set_page_config(
@@ -19,9 +23,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-# Base API URL
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 
 def save_uploaded_file(uploaded_file) -> Path:
@@ -40,24 +41,6 @@ def main():
         "Locate exact video frames and timestamps corresponding to spoken dialogue quotes using "
         "**V2 Optimization (Coarse-to-Fine ASR)**."
     )
-
-    st.sidebar.header("⚙️ Configuration")
-    backend_mode = st.sidebar.radio(
-        "Backend Connection:",
-        ["FastAPI Backend (HTTP)", "Direct Local Pipeline"],
-        index=0,
-    )
-
-    # Check FastAPI server health status
-    if "FastAPI" in backend_mode:
-        try:
-            h_res = requests.get(f"{API_URL}/health", timeout=2)
-            if h_res.status_code == 200:
-                st.sidebar.success("🟢 FastAPI Server Connected")
-            else:
-                st.sidebar.warning("🟡 FastAPI Unreachable -> Will Fallback")
-        except Exception:
-            st.sidebar.warning("🟡 FastAPI Unreachable -> Will Fallback")
 
     st.markdown("---")
 
@@ -117,76 +100,31 @@ def main():
             return
 
         with st.spinner("Processing video and locating exact dialogue frame..."):
-            result_data = None
-            error_msg = None
-
-            if "FastAPI" in backend_mode:
-                try:
-                    resp = requests.post(
-                        f"{API_URL}/localize",
-                        json={"video_source": video_source.strip(), "dialogue_query": dialogue_query.strip()},
-                        timeout=1800,
-                    )
-                    if resp.status_code == 200:
-                        result_data = resp.json()
-                    else:
-                        error_msg = f"FastAPI Server returned status {resp.status_code}: {resp.text}"
-                except Exception as e:
-                    error_msg = f"Failed to connect to FastAPI Backend at {API_URL}: {e}"
-
-            # Fallback to direct pipeline if API fails or direct mode selected
-            if result_data is None:
-                if error_msg and "FastAPI" in backend_mode:
-                    st.warning(f"{error_msg} -> Falling back to Direct Local Pipeline.")
-                try:
-                    src_dir = Path(__file__).resolve().parent / "src"
-                    if str(src_dir) not in sys.path:
-                        sys.path.insert(0, str(src_dir))
-                    from pipeline import localize_dialogue
-
-                    res = localize_dialogue(
-                        video_url_or_path=video_source.strip(),
-                        dialogue_query=dialogue_query.strip(),
-                        mode="v2",
-                    )
-                    if res.match_found:
-                        ts_val = round(res.timestamp, 2) if res.timestamp is not None else 0.0
-                        result_data = {
-                            "match_found": True,
-                            "timestamp": {
-                                "seconds": ts_val,
-                                "formatted": res.timestamp_hms,
-                            },
-                            "frame_number": res.frame_number,
-                            "dialogue": res.extracted_dialogue_text or "",
-                            "confidence": round(res.confidence, 1),
-                            "frame_path": str(res.frame_image_path) if res.frame_image_path else "",
-                            "width": res.width,
-                            "height": res.height,
-                            "pipeline_duration_seconds": round(res.pipeline_duration_seconds, 3),
-                        }
-                    else:
-                        result_data = {"match_found": False, "reason": "dialogue_not_found"}
-                except Exception as ex:
-                    st.error(f"Pipeline Execution Error: {ex}")
-                    return
+            try:
+                res = localize_dialogue(
+                    video_url_or_path=video_source.strip(),
+                    dialogue_query=dialogue_query.strip(),
+                    mode="v2",
+                )
+            except Exception as ex:
+                st.error(f"Pipeline Execution Error: {ex}")
+                return
 
             st.markdown("---")
             st.header("🎯 Localization Output Result")
 
-            if not result_data.get("match_found", False):
+            if not res.match_found:
                 st.error("⚠️ No Dialogue Match Found in Video (`reason: dialogue_not_found`)")
             else:
-                match = result_data
-                ts_formatted = match.get("timestamp", {}).get("formatted", "N/A")
-                ts_seconds = match.get("timestamp", {}).get("seconds", 0.0)
-                frame_no = match.get("frame_number", "N/A")
-                extracted_text = match.get("dialogue", "")
-                confidence = match.get("confidence", 0.0)
-                frame_path = match.get("frame_path", "")
-                width = match.get("width", 1280)
-                height = match.get("height", 720)
-                duration = match.get("pipeline_duration_seconds", 0.0)
+                ts_formatted = res.timestamp_hms
+                ts_seconds = round(res.timestamp, 2) if res.timestamp is not None else 0.0
+                frame_no = res.frame_number if res.frame_number is not None else "N/A"
+                extracted_text = res.extracted_dialogue_text or ""
+                confidence = round(res.confidence, 1)
+                frame_path = str(res.frame_image_path) if res.frame_image_path else ""
+                width = res.width
+                height = res.height
+                duration = round(res.pipeline_duration_seconds, 3)
 
                 # Quality tier label
                 if confidence > 90.0:
@@ -209,7 +147,7 @@ def main():
 
                 st.markdown("---")
 
-                # Dialogue Details Card & Frame Image Side-by-Side or Stacked
+                # Dialogue Details Card & Frame Image Side-by-Side
                 c_details, c_image = st.columns([1, 1])
 
                 with c_details:
