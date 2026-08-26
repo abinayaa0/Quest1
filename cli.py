@@ -42,8 +42,8 @@ def main():
         "--mode",
         type=str,
         default="standard",
-        choices=["standard", "coarse_to_fine"],
-        help="ASR pipeline mode: 'standard' (V1 default) or 'coarse_to_fine' (V2 optimization).",
+        choices=["standard", "v1", "v2", "coarse_to_fine"],
+        help="ASR pipeline mode: 'standard' (V1) or 'v2' (V2 optimization).",
     )
 
     args = parser.parse_args()
@@ -71,10 +71,10 @@ def main():
     if len(sys.argv) == 1:
         print("\n[3] Select ASR Pipeline Mode:")
         print("    1. Standard V1 (Full Audio ASR)")
-        print("    2. Coarse-to-Fine V2 (Two-Stage Optimization)")
+        print("    2. V2 Optimization (Two-Stage Pipeline)")
         mode_choice = input("    Select option [1/2, default 1]: ").strip()
         if mode_choice == "2":
-            mode = "coarse_to_fine"
+            mode = "v2"
 
     print(f"\nProcessing Video:  '{url_or_path}'")
     print(f"Target Phrase:     '{query}'")

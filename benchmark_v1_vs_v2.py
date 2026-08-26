@@ -40,7 +40,7 @@ def run_benchmark(video_path: Path, query: str):
         video_url_or_path=video_path,
         dialogue_query=query,
         model_size="small",
-        mode="coarse_to_fine",
+        mode="v2",
     )
     v2_time = time.time() - t0
 

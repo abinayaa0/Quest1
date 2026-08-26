@@ -68,8 +68,8 @@ def transcribe_audio(
         device: Device to execute model ('cpu' default).
         compute_type: Computation precision ('int8' default for CPU efficiency).
         language: Optional ISO language code (e.g. 'en', 'ru'). Defaults to None (auto-detect).
-        mode: ASR pipeline mode ('standard' for V1 default, 'coarse_to_fine' for V2 optimization).
-        target_query: Spoken dialogue query string required if mode='coarse_to_fine'.
+        mode: ASR pipeline mode ('standard' for V1 default, 'v2' for V2 optimization).
+        target_query: Spoken dialogue query string required if mode='v2'.
         coarse_model_size: Stage 1 coarse Whisper model size (default 'base').
         fine_model_size: Stage 3 fine Whisper model size (default 'small').
         padding_seconds: Padding in seconds before & after candidate region (default 5.0s).
@@ -82,9 +82,9 @@ def transcribe_audio(
         ModelLoadError: Faster-Whisper model failed to load.
         TranscriptionError: ASR inference failed.
     """
-    if mode == "coarse_to_fine":
+    if mode in ("v2", "coarse_to_fine"):
         if not target_query:
-            raise TranscriptionError("target_query is required when mode='coarse_to_fine'")
+            raise TranscriptionError("target_query is required when mode='v2'")
         from .coarse_to_fine import transcribe_audio_coarse_to_fine
 
         return transcribe_audio_coarse_to_fine(

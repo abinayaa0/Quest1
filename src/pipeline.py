@@ -120,7 +120,7 @@ def localize_dialogue(
         output_dir: Directory for storing output artifacts.
         model_size: Faster-Whisper ASR model size ('tiny', 'base', 'small', 'medium').
         confidence_threshold: RapidFuzz minimum match score (default 75.0).
-        mode: ASR pipeline mode ('standard' for V1 default, 'coarse_to_fine' for V2 optimization).
+        mode: ASR pipeline mode ('standard' for V1 default, 'v2' for V2 optimization).
         coarse_model_size: Coarse Whisper model for Stage 1 ('tiny', 'base').
         fine_model_size: Fine Whisper model for Stage 3 ('small', 'base').
 
@@ -153,11 +153,11 @@ def localize_dialogue(
         wav_path = audio_res.audio_path
 
     # 3. ASR Speech Recognition
-    if mode == "coarse_to_fine":
-        logger.info(f"Transcribing audio with Coarse-to-Fine ASR mode for '{dialogue_query}'...")
+    if mode in ("v2", "coarse_to_fine"):
+        logger.info(f"Transcribing audio with V2 Optimization ASR mode for '{dialogue_query}'...")
         asr_res = transcribe_audio(
             wav_path,
-            mode="coarse_to_fine",
+            mode="v2",
             target_query=dialogue_query,
             coarse_model_size=coarse_model_size,
             fine_model_size=fine_model_size,

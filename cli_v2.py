@@ -38,7 +38,7 @@ def main():
     query = args.query
 
     print("\n" + "=" * 65)
-    print("   VIDEO DIALOGUE LOCALIZATION — V2 COARSE-TO-FINE OPTIMIZATION")
+    print("   VIDEO DIALOGUE LOCALIZATION — V2 OPTIMIZATION")
     print("=" * 65)
 
     if not url_or_path:
@@ -53,14 +53,14 @@ def main():
 
     print(f"\nProcessing Video:  '{url_or_path}'")
     print(f"Target Phrase:     '{query}'")
-    print("Pipeline Mode:     'coarse_to_fine' (V2 Optimization)")
+    print("Pipeline Mode:     'v2' (Two-Stage Optimization)")
 
     result = localize_dialogue(
         video_url_or_path=url_or_path,
         dialogue_query=query,
         output_dir="output",
         model_size="small",
-        mode="coarse_to_fine",
+        mode="v2",
     )
 
     result.display()

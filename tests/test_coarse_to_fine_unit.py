@@ -133,7 +133,7 @@ class TestCoarseToFineASR:
                 mock_v2.return_value = MagicMock()
                 transcribe_audio(
                     audio_path=audio_wav,
-                    mode="coarse_to_fine",
+                    mode="v2",
                     target_query="My mind rebels at stagnation",
                 )
                 mock_v2.assert_called_once()
