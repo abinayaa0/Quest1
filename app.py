@@ -192,6 +192,52 @@ def main():
                     else:
                         st.warning(f"Frame image file path not found locally: `{frame_path}`")
 
+            # -------------------------------------------------------------
+            # History Excel & CSV Logging & Interactive Preview
+            # -------------------------------------------------------------
+            try:
+                from history_logger import log_query_result
+                log_query_result(res, mode="v2")
+            except Exception:
+                pass
+
+            st.markdown("---")
+            st.subheader("📊 Saved Query History Log")
+
+            xlsx_file = Path("output/query_history.xlsx")
+            csv_file = Path("output/query_history.csv")
+
+            if xlsx_file.exists():
+                try:
+                    import pandas as pd
+                    df_hist = pd.read_excel(xlsx_file)
+                    st.markdown(f"**Latest Logged Queries (Total Logged: `{len(df_hist)}` records in `output/query_history.xlsx`):**")
+                    st.dataframe(df_hist.tail(5), use_container_width=True)
+                except Exception as ex:
+                    st.warning(f"Could not load Excel history preview: {ex}")
+
+            c1, c2 = st.columns(2)
+            if xlsx_file.exists():
+                with open(xlsx_file, "rb") as f:
+                    c1.download_button(
+                        label="📥 Download History Spreadsheet (Excel .xlsx)",
+                        data=f,
+                        file_name="query_history.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                        key="dl_xlsx_live",
+                    )
+            if csv_file.exists():
+                with open(csv_file, "rb") as f:
+                    c2.download_button(
+                        label="📄 Download History Document (CSV .csv)",
+                        data=f,
+                        file_name="query_history.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                        key="dl_csv_live",
+                    )
+
 
 if __name__ == "__main__":
     main()
