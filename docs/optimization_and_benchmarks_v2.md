@@ -58,17 +58,23 @@ graph TD
 
 ## Key Optimization Breakthroughs & Empirical Benchmarks
 
-### Optimization 1: Multi-Core Parallel Audio Chunk ASR (Phase 7)
-* **Problem**: Sequential transcription of long audio files (>30 minutes) on CPU was constrained by single-threaded CTranslate2 decoding bottlenecks.
+### 4.1 Multi-Core Parallel Chunk ASR (8 CPU Thread Optimization)
+* **Problem**: CTranslate2 speech decoding on CPU is single-threaded per stream; transcribing long video files (>30–50+ minutes) sequentially creates severe execution bottlenecks.
 * **Implementation**:
-  * Audio file is sliced into 10-minute 16kHz mono WAV chunks using sample-accurate `-c:a pcm_s16le` codec.
-  * Multi-core execution uses a single shared `WhisperModel(num_workers=2)` instance bound to `ThreadPoolExecutor`.
-  * OpenMP/MKL thread oversubscription memory spikes resolved by binding `OMP_NUM_THREADS = 10` and `MKL_NUM_THREADS = 10`.
-* **Empirical Benchmark (33.6-Minute YouTube Video `Y3_jS-q0Lkw`)**:
-  * **Sequential Processing (Before)**: `624.55 seconds` (10.4 minutes)
-  * **Multi-Core Parallel Processing (After)**: **`563.06 seconds` (9.3 minutes)**
-  * **Time Saved**: **`61.49 seconds` faster**
-  * **RAM Footprint**: **~461 MB** *(Shared weight matrix)*
+  * Audio file is sliced into 10-minute (600s) 16kHz mono WAV chunks using sample-accurate `-c:a pcm_s16le` PCM encoding.
+  * **Dynamic Multi-Core Allocation**: Automatically detects host CPU capacity (`os.cpu_count()`) and binds `cpu_threads = min(8, os.cpu_count())` with `OMP_NUM_THREADS = 8` and `MKL_NUM_THREADS = 8` environment controls to eliminate MKL memory heap oversubscription.
+  * For long audio files, a `ThreadPoolExecutor` distributes chunks across `max_workers = 2` concurrent worker streams (allocating 10 CPU threads per worker stream on 20-thread processors).
+  * Uses a single shared `WhisperModel(num_workers=2)` instance, sharing in-memory model weight matrices (~140 MB for `base`, ~75 MB for `tiny`) across threads without duplicating RAM.
+
+* **Empirical Benchmarks (52.2-Minute OK.ru Video `7869007661646` on 8 CPU Threads)**:
+
+| Pipeline Engine | Coarse Model Size | Stage 1 Coarse ASR Time | Total Cold Execution Time | Time Saved vs Baseline | Cold Run Performance |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **V1 Baseline (Sequential)** | `small` (full audio) | 295.42s (~5.0 min) | 303.11s (~5.1 min) | Baseline | 1.0x (Baseline) |
+| **V2 Parallel (`base`)** | `base` (parallel chunks) | 213.04s (~3.5 min) | 229.71s (~3.8 min) | **73.40s saved (~1.2 min)** | **1.32x faster** |
+| **V2 Parallel (`tiny`)** | `tiny` (parallel chunks) | **110.67s (~1.8 min)** | **122.02s (~2.0 min)** | **181.09s saved (~3.0 min)** | **2.48x faster (62.5% reduction)** |
+
+* **Memory Footprint**: **~75 MB RAM** (`tiny`) / **~140 MB RAM** (`base`) *(Shared CTranslate2 weight matrix across all threads)*.
 
 ---
 
