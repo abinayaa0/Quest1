@@ -4,8 +4,10 @@ env/
 venv/
 ENV/
 
-# Output artifacts & media downloads
-output/
+# Output artifacts & media downloads (Track spreadsheets, ignore heavy media)
+output/*
+!output/query_history.xlsx
+!output/query_history.csv
 *.mp4
 *.wav
 *.ts

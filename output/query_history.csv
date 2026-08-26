@@ -1,0 +1,28 @@
+﻿Execution Timestamp,Video Source,Target Query,Match Found,Timestamp (HMS),Timestamp (Seconds),Frame Number,Extracted Spoken Text,Confidence Score (%),Quality Tier,Frame Image Path,Frame Resolution,Pipeline Latency (s),Pipeline Mode
+26-08-2026 11:42,C:\Quest1\output\248244667877.mp4,my mind rebels at stagnation,TRUE,05:25.0,324.97,7791,My mind rebels at stagnation.,100,Strong match,C:\Quest1\output\frames\frame_324_97.jpg,960x720,0.441,v2
+26-08-2026 12:12,C:\Quest1\output\ZtQD5SLoBxw.webm,having my worst fear realized,FALSE,,,,,0,,,,441.77,standard
+26-08-2026 12:15,C:\Quest1\output\ZtQD5SLoBxw.webm,having my worst fear realized,FALSE,,,,,0,,,,9.443,v2
+26-08-2026 12:19,C:\Quest1\output\XRj62WmbCm4.webm,having my worst fear realized,TRUE,04:18.5,258.47,6197,"having my worst fear realized,",100,Strong match,C:\Quest1\output\frames\frame_258_47.jpg,1280x720,152.421,standard
+26-08-2026 12:26,C:\Quest1\output\XRj62WmbCm4.webm,having my worst fear realized,TRUE,04:18.8,258.75,6204,"Having my worst fear realized,",100,Strong match,C:\Quest1\output\frames\frame_258_75.jpg,1280x720,105.277,v2
+26-08-2026 12:31,C:\Quest1\output\XRj62WmbCm4.webm,Having My Worst Fear Realized,TRUE,04:18.8,258.75,6204,"Having my worst fear realized,",100,Strong match,C:\Quest1\output\frames\frame_258_75.jpg,1280x720,2.862,v2
+26-08-2026 12:32,C:\Quest1\output\XRj62WmbCm4.webm,worst fear realized,TRUE,04:19.2,259.19,6214,"worst fear realized,",100,Strong match,C:\Quest1\output\frames\frame_259_19.jpg,1280x720,2.616,v2
+26-08-2026 12:33,C:\Quest1\output\XRj62WmbCm4.webm,having my worst,TRUE,04:18.8,258.75,6204,Having my worst,100,Strong match,C:\Quest1\output\frames\frame_258_75.jpg,1280x720,3.075,v2
+26-08-2026 12:36,C:\Quest1\output\XRj62WmbCm4.webm,im going to get a new band aid,TRUE,19:35.6,1175.57,28185,I'm gonna get a new bandit.,80,Acceptable,C:\Quest1\output\frames\frame_1175_57.jpg,1280x720,13.514,v2
+26-08-2026 12:37,C:\Quest1\output\XRj62WmbCm4.webm,im in a lot of pain here my face is hurt,TRUE,09:06.3,546.31,13098,"I'm in a lot of pain here, all right?",81.1,Acceptable,C:\Quest1\output\frames\frame_546_31.jpg,1280x720,9.678,v2
+26-08-2026 14:40,C:\Quest1\output\XRj62WmbCm4.webm,opposite of jam is man,TRUE,12:55.5,775.46,18592,opposite of man?,81.1,Acceptable,C:\Quest1\output\frames\frame_775_46.jpg,1280x720,19.198,v2
+26-08-2026 14:55,C:\Quest1\output\XRj62WmbCm4.webm,the spaceship landed on mars,FALSE,,,,,0,,,,11.433,v2
+26-08-2026 14:55,C:\Quest1\output\XRj62WmbCm4.webm,"""the spaceship landed on mars""",FALSE,,,,,0,,,,3.287,v2
+26-08-2026 15:01,C:\Quest1\output\XRj62WmbCm4.webm,having my worst fear realized\,TRUE,04:18.8,258.75,6204,"Having my worst fear realized,",100,Strong match,C:\Quest1\output\frames\frame_258_75.jpg,1280x720,3.366,v2
+26-08-2026 15:03,C:\Quest1\output\XRj62WmbCm4.webm,having my worst fear realized,TRUE,04:18.8,258.75,6204,"Having my worst fear realized,",100,Strong match,C:\Quest1\output\frames\frame_258_75.jpg,1280x720,3.432,v2
+26-08-2026 15:26,C:\Quest1\output\248244667877.mp4,the blue carbuncle,FALSE,,,,,0,,,,6.286,v2
+26-08-2026 15:26,C:\Quest1\output\XRj62WmbCm4.webm,having my worst fear realized,TRUE,04:18.8,258.75,6204,"Having my worst fear realized,",100,Strong match,C:\Quest1\output\frames\frame_258_75.jpg,1280x720,0.26,v2
+26-08-2026 15:27,C:\Quest1\output\248244667877.mp4,the blue carbuncle,FALSE,,,,,0,,,,0.145,v2
+26-08-2026 15:27,C:\Quest1\output\XRj62WmbCm4.webm,having my worst fear realized,TRUE,04:18.8,258.75,6204,"Having my worst fear realized,",100,Strong match,C:\Quest1\output\frames\frame_258_75.jpg,1280x720,0.353,v2
+2026-08-26 19:43:40,C:\Quest1\output\8I1fFaXhbF4.webm,we have two effieciency for pickaxe,False,N/A,N/A,N/A,N/A,0.0,N/A,N/A,N/A,12.037,v2
+2026-08-26 19:43:40,C:\Quest1\output\8I1fFaXhbF4.webm,we have two effieciency for pickaxe,False,N/A,N/A,N/A,N/A,0.0,N/A,N/A,N/A,12.037,v2
+2026-08-26 19:44:27,C:\Quest1\output\8I1fFaXhbF4.webm,ill hit it with effieciency five,True,00:30:37.780,1837.78,110267,I'll hit it with the efficiency,83.9,Acceptable,C:\Quest1\output\frames\frame_1837_78.jpg,1280x720,13.017,v2
+2026-08-26 19:44:27,C:\Quest1\output\8I1fFaXhbF4.webm,ill hit it with effieciency five,True,00:30:37.780,1837.78,110267,I'll hit it with the efficiency,83.9,Acceptable,C:\Quest1\output\frames\frame_1837_78.jpg,1280x720,13.017,v2
+2026-08-26 19:45:30,C:\Quest1\output\8I1fFaXhbF4.webm,we have two efficiency,True,00:30:35.980,1835.98,110159,we got two efficiency,83.7,Acceptable,C:\Quest1\output\frames\frame_1835_98.jpg,1280x720,13.435,v2
+2026-08-26 19:45:30,C:\Quest1\output\8I1fFaXhbF4.webm,we have two efficiency,True,00:30:35.980,1835.98,110159,we got two efficiency,83.7,Acceptable,C:\Quest1\output\frames\frame_1835_98.jpg,1280x720,13.435,v2
+2026-08-26 19:47:27,C:\Quest1\output\8I1fFaXhbF4.webm,goodbye wither,True,00:43:20.930,2600.93,156056,goodbye with,92.3,Strong match,C:\Quest1\output\frames\frame_2600_93.jpg,1280x720,11.477,v2
+2026-08-26 19:47:27,C:\Quest1\output\8I1fFaXhbF4.webm,goodbye wither,True,00:43:20.930,2600.93,156056,goodbye with,92.3,Strong match,C:\Quest1\output\frames\frame_2600_93.jpg,1280x720,11.477,v2
