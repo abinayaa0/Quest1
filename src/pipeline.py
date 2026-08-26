@@ -184,7 +184,7 @@ def localize_dialogue(
     elapsed_t = round(time.time() - start_t, 3)
 
     if not match_res.match_found:
-        return LocalizationResult(
+        res = LocalizationResult(
             video_path=video_path,
             dialogue_query=dialogue_query,
             match_found=False,
@@ -197,6 +197,12 @@ def localize_dialogue(
             height=0,
             pipeline_duration_seconds=elapsed_t,
         )
+        try:
+            from history_logger import log_query_result
+            log_query_result(res, mode=mode, output_dir=out_dir)
+        except Exception as e:
+            logger.warning(f"Could not log query result history: {e}")
+        return res
 
     # Calculate frame number estimate if fps is available
     timestamp = match_res.start_time
@@ -223,7 +229,7 @@ def localize_dialogue(
 
     elapsed_t = round(time.time() - start_t, 3)
 
-    return LocalizationResult(
+    res = LocalizationResult(
         video_path=video_path,
         dialogue_query=dialogue_query,
         match_found=True,
@@ -236,3 +242,11 @@ def localize_dialogue(
         height=frame_res.height,
         pipeline_duration_seconds=elapsed_t,
     )
+
+    try:
+        from history_logger import log_query_result
+        log_query_result(res, mode=mode, output_dir=out_dir)
+    except Exception as e:
+        logger.warning(f"Could not log query result history: {e}")
+
+    return res

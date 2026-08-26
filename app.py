@@ -40,7 +40,29 @@ def main():
     st.markdown(
         "Locate exact video frames and timestamps corresponding to spoken dialogue quotes using "
         "**V2 Optimization (Coarse-to-Fine ASR)**."
-    )
+    st.sidebar.header("📊 History Log")
+    xlsx_path = Path("output/query_history.xlsx")
+    csv_path = Path("output/query_history.csv")
+
+    if xlsx_path.exists():
+        with open(xlsx_path, "rb") as f:
+            st.sidebar.download_button(
+                label="📥 Download History (Excel .xlsx)",
+                data=f,
+                file_name="query_history.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+
+    if csv_path.exists():
+        with open(csv_path, "rb") as f:
+            st.sidebar.download_button(
+                label="📄 Download History (CSV .csv)",
+                data=f,
+                file_name="query_history.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
 
     st.markdown("---")
 
