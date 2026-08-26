@@ -8,6 +8,7 @@ ENV/
 output/*
 !output/query_history.xlsx
 !output/query_history.csv
+!output/Video_Dialogue_Localization_Documentation.pdf
 *.mp4
 *.wav
 *.ts
