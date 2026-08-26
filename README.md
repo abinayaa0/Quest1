@@ -9,49 +9,51 @@ An end-to-end Python pipeline for ingesting public video URLs (YouTube, OK.ru, V
 
 ## 📌 System Overview
 
-The system processes public video content across structured pipeline phases to localize target dialogue queries to exact video frames:
+```mermaid
+graph TD
+    classDef ui fill:#2B6CB0,stroke:#2C5282,color:#FFFFFF,font-weight:bold;
+    classDef ingest fill:#D69E2E,stroke:#B7791F,color:#FFFFFF,font-weight:bold;
+    classDef asr fill:#319795,stroke:#2C7A7B,color:#FFFFFF,font-weight:bold;
+    classDef match fill:#805AD5,stroke:#6B46C1,color:#FFFFFF,font-weight:bold;
+    classDef out fill:#38A169,stroke:#2F855A,color:#FFFFFF,font-weight:bold;
 
-```
-Public Video URL
-       │
-       ▼
-┌────────────────────────────────────────┐
-│ Phase 2: Video Ingestion               │  yt-dlp + FFmpeg + ffprobe
-│ - Resolves platform URLs & extractors  │
-│ - Selects <=720p A/V streams & merges   │
-│ - Validates video/audio & rational FPS │
-└──────────────┬─────────────────────────┘
-               │
-               ▼  Local Video (.mp4)
-┌────────────────────────────────────────┐
-│ Phase 3: Audio Extraction              │  FFmpeg (-vn -ac 1 -ar 16000)
-│ - Extracts speech-ready 16kHz mono WAV │
-│ - Validates pcm_s16le audio stream     │
-└──────────────┬─────────────────────────┘
-               │
-               ▼  Speech Audio (.wav, 16kHz mono)
-┌────────────────────────────────────────┐
-│ Phase 4: ASR Speech Recognition        │  Faster-Whisper (CPU / int8)
-│ - Segment & word-level timestamps      │
-│ - Language detection                   │
-│ - VAD (Voice Activity Filter)          │
-└──────────────┬─────────────────────────┘
-               │
-               ▼  Timestamped Transcript JSON
-┌────────────────────────────────────────┐
-│ Phase 5: Dialogue Matching             │  RapidFuzz + Word Windows
-│ - Sliding window dialogue search       │
-│ - First occurrence detection           │
-│ - Fuzzy text matching & scoring        │
-└──────────────┬─────────────────────────┘
-               │
-               ▼  Match Result (start_time, end_time, confidence)
-┌────────────────────────────────────────┐
-│ Phase 6: Frame Extraction              │  FFmpeg (-ss timestamp -vframes 1)
-│ - Exact PTS timestamp-based seek       │
-│ - CFR & VFR container compatible       │
-│ - Frame resolution & metadata probe    │
-└────────────────────────────────────────┘
+    subgraph UI ["User Interfaces"]
+        A1["Streamlit Web UI (app.py)"]:::ui
+        A2["Interactive CLI (cli_v2.py)"]:::ui
+    end
+
+    subgraph Ingestion ["1. Ingestion & Audio Extraction"]
+        B1["Video Downloader & Local Cache\n(yt-dlp + FFmpeg)"]:::ingest
+        B2["Audio Extractor\n(16kHz Mono PCM WAV)"]:::ingest
+    end
+
+    subgraph Core ["2. V2 Coarse-to-Fine Pipeline Engine"]
+        C1["Stage 1: Coarse ASR Search\n(Whisper 'base' + 8-CPU Threads)"]:::asr
+        C2[("Coarse Disk Cache\n_transcript_coarse_base.json")]:::asr
+        
+        D1["Stage 2: RapidFuzz Dialogue Matcher\n(Partial/Token Ratio + Word Coverage)"]:::match
+        
+        E1["Stage 3: Fine Word Timestamp ASR\n(Whisper 'small' on 20s Window)"]:::asr
+        E2[("Fine Slice Cache\n_v2_fine_cache.json")]:::asr
+    end
+
+    subgraph Output ["3. Frame Extraction & Data Logging"]
+        F1["Sample-Accurate Frame Extractor\n(FFmpeg -20ms Pre-Roll Seek)"]:::out
+        F2["Target Frame Image\n(output/frames/frame_xxx.jpg)"]:::out
+        F3["History Logger\n(query_history.xlsx & .csv)"]:::out
+    end
+
+    A1 --> B1
+    A2 --> B1
+    B1 --> B2
+    B2 --> C1
+    C1 <--> C2
+    C1 --> D1
+    D1 --> E1
+    E1 <--> E2
+    E1 --> F1
+    F1 --> F2
+    F1 --> F3
 ```
 
 ---

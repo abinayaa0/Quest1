@@ -9,33 +9,49 @@ This document provides a comprehensive technical reference for the **Video Dialo
 
 ```mermaid
 graph TD
-    subgraph Mode Selection
-        A[User Input: Video URL / Path + Query] --> B{ASR Mode}
+    classDef ui fill:#2B6CB0,stroke:#2C5282,color:#FFFFFF,font-weight:bold;
+    classDef ingest fill:#D69E2E,stroke:#B7791F,color:#FFFFFF,font-weight:bold;
+    classDef asr fill:#319795,stroke:#2C7A7B,color:#FFFFFF,font-weight:bold;
+    classDef match fill:#805AD5,stroke:#6B46C1,color:#FFFFFF,font-weight:bold;
+    classDef out fill:#38A169,stroke:#2F855A,color:#FFFFFF,font-weight:bold;
+
+    subgraph UI ["User Access Interfaces"]
+        A1["Streamlit Web UI (app.py)"]:::ui
+        A2["Interactive CLI (cli_v2.py)"]:::ui
     end
 
-    subgraph Standard V1 Pipeline mode='standard'
-        B -->|standard| C1[Full Audio Transcription: Faster-Whisper small + word_timestamps=True]
-        C1 --> C2[RapidFuzz Sliding Window Matching]
-        C2 --> C3[20ms Pre-Roll Frame Extraction]
+    subgraph Ingestion ["1. Ingestion & Audio Extraction"]
+        B1["Video Downloader & Local Cache\n(yt-dlp + FFmpeg)"]:::ingest
+        B2["Audio Extractor\n(16kHz Mono PCM WAV)"]:::ingest
     end
 
-    subgraph Coarse-to-Fine V2 Pipeline mode='coarse_to_fine'
-        B -->|coarse_to_fine| D1{Stage 1: Coarse Cache Exists?}
-        D1 -->|No| D2[Stage 1: Coarse ASR - Faster-Whisper base + word_timestamps=False]
-        D1 -->|Yes| D3[Load _transcript_coarse_base.json - 0.01s]
-        D2 --> D4[Save _transcript_coarse_base.json]
-        D4 --> D5[Stage 2: Top-K Candidate Region Search top_k=3 + 5s padding]
-        D3 --> D5
-        D5 --> D6{Stage 3: Fine Cache Exists?}
-        D6 -->|Yes| D7[Load _v2_fine_cache.json - 0.01s]
-        D6 -->|No| D8[FFmpeg Slice Candidate WAV + Fine ASR - Faster-Whisper small + word_timestamps=True]
-        D8 --> D9[Save _v2_fine_cache.json]
-        D7 --> E[Dialogue Matching & Frame Extraction]
-        D9 --> E
+    subgraph Core ["2. V2 Coarse-to-Fine Pipeline Engine"]
+        C1["Stage 1: Coarse ASR Search\n(Whisper 'base' + 8-CPU Threads)"]:::asr
+        C2[("Coarse Disk Cache\n_transcript_coarse_base.json")]:::asr
+        
+        D1["Stage 2: RapidFuzz Dialogue Matcher\n(Partial/Token Ratio + Word Coverage)"]:::match
+        
+        E1["Stage 3: Fine Word Timestamp ASR\n(Whisper 'small' on 20s Window)"]:::asr
+        E2[("Fine Slice Cache\n_v2_fine_cache.json")]:::asr
     end
 
-    C3 --> F[LocalizationResult: HMS Timestamp, Frame Image, Confidence]
-    E --> F
+    subgraph Output ["3. Frame Extraction & Data Logging"]
+        F1["Sample-Accurate Frame Extractor\n(FFmpeg -20ms Pre-Roll Seek)"]:::out
+        F2["Target Frame Image\n(output/frames/frame_xxx.jpg)"]:::out
+        F3["History Logger\n(query_history.xlsx & .csv)"]:::out
+    end
+
+    A1 --> B1
+    A2 --> B1
+    B1 --> B2
+    B2 --> C1
+    C1 <--> C2
+    C1 --> D1
+    D1 --> E1
+    E1 <--> E2
+    E1 --> F1
+    F1 --> F2
+    F1 --> F3
 ```
 
 ---
