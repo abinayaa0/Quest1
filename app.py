@@ -65,18 +65,6 @@ def main():
                 use_container_width=True,
             )
 
-    st.sidebar.header("📚 System Documentation")
-    pdf_path = Path("Video_Dialogue_Localization_Documentation.pdf")
-    if pdf_path.exists():
-        with open(pdf_path, "rb") as f:
-            st.sidebar.download_button(
-                label="📕 Download Combined PDF Docs",
-                data=f,
-                file_name="Video_Dialogue_Localization_Documentation.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-            )
-
     st.markdown("---")
 
     col_input, col_info = st.columns([2, 1])
