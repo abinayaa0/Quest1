@@ -44,11 +44,11 @@ The system locates the quote, calculates the exact timestamp, displays match det
 
 ## 📚 Documentation & Development History
 
-All full design documents, architecture explanations, benchmarks, and LLM development prompts are organized under the [`docs/`](docs/) directory:
+All full design documents, architecture explanations, benchmarks, and LLM development prompts are organized under the [docs/](https://github.com/abinayaa0/Quest1/tree/main/docs) directory:
 
-- 📄 **[System Design & Engineering Approach](docs/DESIGN_AND_APPROACH.md)** — Detailed technical design, pipeline stages, trade-off decisions, and benchmark matrices.
-- 📝 **[Development & Code Generation Prompts](docs/PROMPTS.md)** — Consolidated history of implementation prompts and research queries used during development.
-- 📂 **[Explore Docs Directory](docs/)** — Browse all project documentation files.
+- 📄 **[System Design & Engineering Approach](https://github.com/abinayaa0/Quest1/blob/main/docs/DESIGN_AND_APPROACH.md)** — Detailed technical design, pipeline stages, trade-off decisions, and benchmark matrices.
+- 📝 **[Development & Code Generation Prompts](https://github.com/abinayaa0/Quest1/blob/main/docs/PROMPTS.md)** — Consolidated history of implementation prompts and research queries used during development.
+- 📂 **[Explore Docs Directory](https://github.com/abinayaa0/Quest1/tree/main/docs)** — Browse all project documentation files.
 
 ---
 
